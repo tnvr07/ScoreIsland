@@ -56,6 +56,21 @@
           </label>
         </section>
 
+        <section class="live-board" id="live-board" aria-label="Live matches">
+          <div class="live-board-heading">
+            <div class="live-board-title">
+              <span class="live-pulse"><span></span></span>
+              <div><span class="live-kicker">HAPPENING NOW</span><h2>Live on the pitch</h2></div>
+            </div>
+            <button class="live-board-link" type="button" data-view="live">All live matches <span aria-hidden="true">→</span></button>
+          </div>
+          <div class="live-board-grid" id="live-board-grid"></div>
+          <div class="live-board-empty" id="live-board-empty" hidden>
+            <span>Quiet on the pitch right now.</span>
+            <button type="button" data-view="all">Browse today’s fixtures <span aria-hidden="true">→</span></button>
+          </div>
+        </section>
+
         <div class="dashboard-grid">
           <aside class="competition-sidebar" aria-label="Competition filters">
             <div class="sidebar-heading">

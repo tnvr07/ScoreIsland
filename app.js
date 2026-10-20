@@ -248,10 +248,14 @@ function scoreMarkup(match) {
   return `<span class="score"><span class="${match.home.winner ? "winner" : ""}">${escapeHTML(match.home.score ?? "0")}</span><span class="score-separator">:</span><span class="${match.away.winner ? "winner" : ""}">${escapeHTML(match.away.score ?? "0")}</span></span>`;
 }
 
-function teamMarkup(team, side) {
-  const badge = team.logo
+function teamBadgeMarkup(team) {
+  return team.logo
     ? `<span class="team-badge"><img src="${escapeHTML(team.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"><span class="team-initials">${escapeHTML(team.abbreviation.slice(0, 3))}</span></span>`
     : `<span class="team-badge no-logo" style="--team-color:${escapeHTML(team.color)}"><span class="team-initials">${escapeHTML(team.abbreviation.slice(0, 3))}</span></span>`;
+}
+
+function teamMarkup(team, side) {
+  const badge = teamBadgeMarkup(team);
   return `<span class="team team-${side}${side === "away" ? " away-team" : ""}">
     ${side === "home" ? badge : ""}
     <span class="team-label"><span class="team-name">${escapeHTML(team.shortName)}</span><span class="team-record">${escapeHTML(team.record)}</span></span>
@@ -288,6 +292,40 @@ function renderMatch(match) {
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91L12 3Z"></path></svg>
     </button>
   </article>`;
+}
+
+function renderLiveBoard() {
+  const liveMatches = matches.filter(({ state }) => state === "in");
+  const grid = document.querySelector("#live-board-grid");
+  const empty = document.querySelector("#live-board-empty");
+  const board = document.querySelector("#live-board");
+  if (!matches.length) {
+    board.hidden = true;
+    return;
+  }
+  board.hidden = false;
+  empty.hidden = liveMatches.length > 0;
+  grid.hidden = liveMatches.length === 0;
+  if (!liveMatches.length) {
+    grid.innerHTML = "";
+    return;
+  }
+  grid.innerHTML = liveMatches.slice(0, 3).map((match) => {
+    const detail = detailCache.get(match.id);
+    const latestEvent = detail?.keyEvents?.length ? detail.keyEvents[detail.keyEvents.length - 1] : null;
+    const moment = latestEvent
+      ? `<span class="live-card-event"><span>${escapeHTML(eventIcon(latestEvent.type?.text))}</span>${escapeHTML(latestEvent.shortText || latestEvent.text || "Match event")}</span>`
+      : `<span class="live-card-event neutral"><span class="live-card-event-dot"></span>${escapeHTML(match.stage || match.league)}</span>`;
+    return `<button class="live-card${match.id === selectedMatchId ? " selected" : ""}" type="button" data-live-match="${escapeHTML(match.id)}" aria-label="Open ${escapeHTML(match.home.name)} versus ${escapeHTML(match.away.name)}">
+      <span class="live-card-meta"><span class="live-card-league">${escapeHTML(match.league)}</span><span class="live-card-minute"><span class="clock-dot"></span>${escapeHTML(match.displayClock || match.status)}</span></span>
+      <span class="live-card-scoreline">
+        <span class="live-card-team">${teamBadgeMarkup(match.home)}<span>${escapeHTML(match.home.shortName)}</span></span>
+        <span class="live-card-score">${escapeHTML(match.home.score ?? "0")}<span>:</span>${escapeHTML(match.away.score ?? "0")}</span>
+        <span class="live-card-team away"><span>${escapeHTML(match.away.shortName)}</span>${teamBadgeMarkup(match.away)}</span>
+      </span>
+      ${moment}
+    </button>`;
+  }).join("");
 }
 
 function renderMatches() {
@@ -331,6 +369,7 @@ function renderMatches() {
   document.querySelector("#broadcast-count").textContent = matches.filter(({ hasBroadcast }) => hasBroadcast).length;
   renderCompetitionFilters();
   renderDates();
+  renderLiveBoard();
 }
 
 function setActiveStatus(status) {
@@ -380,6 +419,10 @@ async function loadMatches({ force = false } = {}) {
       selectedMatchId = null;
       showEmptyDetail();
     }
+    if (!selectedMatchId) {
+      const preferredMatch = matches.find(({ state }) => state === "in") ?? matches[0];
+      if (preferredMatch) selectedMatchId = preferredMatch.id;
+    }
     setFeedStatus("connected", "SCORES CONNECTED");
     document.querySelector("#error-banner").hidden = true;
     renderMatches();
@@ -415,6 +458,7 @@ function showEmptyDetail() {
   detailElement.hidden = true;
   detailElement.innerHTML = "";
   document.querySelector("#match-panel").classList.remove("mobile-open");
+  document.body.classList.remove("detail-open");
 }
 
 function detailTeamMarkup(team) {
@@ -539,7 +583,7 @@ function detailTabMarkup(match, detail) {
   return detailOverview(match, detail);
 }
 
-function renderDetail() {
+function renderDetail({ openMobile = false } = {}) {
   const match = matchCache.get(selectedMatchId);
   if (!match) return showEmptyDetail();
   const detail = detailCache.get(match.id);
@@ -564,7 +608,10 @@ function renderDetail() {
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91L12 3Z"></path></svg>
       ${favorites.has(match.id) ? "Following match" : "Follow match"}
     </button>`;
-  document.querySelector("#match-panel").classList.add("mobile-open");
+  if (openMobile && window.matchMedia("(max-width: 720px)").matches) {
+    document.querySelector("#match-panel").classList.add("mobile-open");
+    document.body.classList.add("detail-open");
+  }
 }
 
 async function loadMatchDetails(match) {
@@ -574,6 +621,7 @@ async function loadMatchDetails(match) {
     if (!response.ok) throw new Error(`Match details returned HTTP ${response.status}.`);
     const detail = await response.json();
     detailCache.set(match.id, detail);
+    renderLiveBoard();
     if (selectedMatchId === match.id) renderDetail();
   } catch (error) {
     console.error(`Unable to load match details for ${match.id}.`, error);
@@ -584,11 +632,11 @@ async function loadMatchDetails(match) {
   }
 }
 
-function selectMatch(matchId) {
+function selectMatch(matchId, { openMobile = true } = {}) {
   selectedMatchId = matchId;
   selectedDetailTab = "overview";
   renderMatches();
-  renderDetail();
+  renderDetail({ openMobile });
   const match = matchCache.get(matchId);
   if (match) loadMatchDetails(match);
 }
@@ -682,6 +730,16 @@ listElement.addEventListener("click", (event) => {
     const match = matchButton.closest("[data-match]");
     if (match) selectMatch(match.dataset.match);
   }
+});
+
+document.querySelector("#live-board-grid").addEventListener("click", (event) => {
+  const card = event.target.closest("[data-live-match]");
+  if (card) selectMatch(card.dataset.liveMatch);
+});
+
+document.querySelector("#live-board").addEventListener("click", (event) => {
+  const viewButton = event.target.closest("[data-view]");
+  if (viewButton) setActiveStatus(viewButton.dataset.view);
 });
 
 detailElement.addEventListener("click", (event) => {
