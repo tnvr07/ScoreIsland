@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#101110">
+    <meta name="theme-color" content="#062e32">
     <meta name="description" content="Football scores, fixtures, match events, statistics and lineups from around the world.">
     <title>Touchline — Football Scores</title>
     <link rel="stylesheet" href="styles.css">
@@ -24,9 +24,19 @@
         </nav>
         <div class="topbar-right">
           <span class="feed-status loading" id="feed-status"><span class="status-dot"></span><span id="feed-status-text">CONNECTING TO SCORES</span></span>
-          <button class="icon-button theme-button" type="button" aria-label="Toggle color theme" title="Toggle color theme">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>
-          </button>
+          <div class="theme-picker">
+            <button class="icon-button theme-button" id="theme-button" type="button" aria-label="Choose color theme" aria-haspopup="menu" aria-expanded="false" aria-controls="theme-menu" title="Choose color theme">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.1 2.1 0 0 0 1.5-3.6 1.5 1.5 0 0 1 1.1-2.5H18a3 3 0 0 0 3-3c0-5-4-8.9-9-8.9Z"></path><circle cx="7.5" cy="11" r="1"></circle><circle cx="10" cy="7.5" r="1"></circle><circle cx="14.5" cy="8" r="1"></circle><circle cx="17" cy="11.5" r="1"></circle></svg>
+              <span class="theme-current">Aurora</span>
+              <svg class="theme-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"></path></svg>
+            </button>
+            <div class="theme-menu" id="theme-menu" role="menu" aria-label="Color themes" hidden>
+              <span class="theme-menu-label">APPEARANCE</span>
+              <button type="button" role="menuitemradio" aria-checked="true" data-theme-choice="aurora"><span class="theme-swatch aurora-swatch"></span>Aurora<span class="theme-check" aria-hidden="true">✓</span></button>
+              <button type="button" role="menuitemradio" aria-checked="false" data-theme-choice="neon"><span class="theme-swatch neon-swatch"></span>Neon<span class="theme-check" aria-hidden="true">✓</span></button>
+              <button type="button" role="menuitemradio" aria-checked="false" data-theme-choice="light"><span class="theme-swatch light-swatch"></span>Daylight<span class="theme-check" aria-hidden="true">✓</span></button>
+            </div>
+          </div>
         </div>
       </header>
 

@@ -99,6 +99,43 @@ function savedFavorites() {
 }
 
 const favorites = savedFavorites();
+const themeButton = document.querySelector("#theme-button");
+const themeMenu = document.querySelector("#theme-menu");
+const themeOptions = [...themeMenu.querySelectorAll("[data-theme-choice]")];
+const THEME_NAMES = { aurora: "Aurora", neon: "Neon", light: "Daylight" };
+
+function savedTheme() {
+  try {
+    const theme = localStorage.getItem("touchline-theme");
+    return Object.hasOwn(THEME_NAMES, theme) ? theme : "aurora";
+  } catch (error) {
+    console.error("Browser storage is unavailable; the color theme will not persist.", error);
+    return "aurora";
+  }
+}
+
+function applyTheme(theme) {
+  document.body.classList.toggle("light-theme", theme === "light");
+  document.body.classList.toggle("neon-theme", theme === "neon");
+  document.querySelector('meta[name="theme-color"]').content = theme === "light" ? "#f4f1e9" : theme === "neon" ? "#10102f" : "#062e32";
+  themeButton.querySelector(".theme-current").textContent = THEME_NAMES[theme];
+  themeButton.setAttribute("aria-label", `Color theme: ${THEME_NAMES[theme]}`);
+  themeButton.title = `Color theme: ${THEME_NAMES[theme]}`;
+  themeOptions.forEach((option) => option.setAttribute("aria-checked", String(option.dataset.themeChoice === theme)));
+  try {
+    localStorage.setItem("touchline-theme", theme);
+  } catch (error) {
+    console.error("Could not save the selected color theme.", error);
+  }
+}
+
+function setThemeMenuOpen(open, focusFirst = false) {
+  themeMenu.hidden = !open;
+  themeButton.setAttribute("aria-expanded", String(open));
+  if (open && focusFirst) themeOptions.find((option) => option.getAttribute("aria-checked") === "true")?.focus();
+}
+
+applyTheme(savedTheme());
 
 function setFeedStatus(state, text) {
   const element = document.querySelector("#feed-status");
@@ -249,9 +286,12 @@ function scoreMarkup(match) {
 }
 
 function teamBadgeMarkup(team) {
-  return team.logo
-    ? `<span class="team-badge"><img src="${escapeHTML(team.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"><span class="team-initials">${escapeHTML(team.abbreviation.slice(0, 3))}</span></span>`
-    : `<span class="team-badge no-logo" style="--team-color:${escapeHTML(team.color)}"><span class="team-initials">${escapeHTML(team.abbreviation.slice(0, 3))}</span></span>`;
+  const crest = team.logo
+    ? `<img src="${escapeHTML(team.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
+    : "";
+  return `<span class="team-badge${team.logo ? "" : " no-logo"}" style="--team-color:${escapeHTML(team.color)}">
+    <span class="flag-fabric" aria-hidden="true"></span>${crest}<span class="team-initials">${escapeHTML(team.abbreviation.slice(0, 3))}</span>
+  </span>`;
 }
 
 function teamMarkup(team, side) {
@@ -407,15 +447,33 @@ async function loadMatches({ force = false } = {}) {
   setFeedStatus("loading", "UPDATING SCORES");
   document.querySelector("#error-banner").hidden = true;
   try {
-    const url = `${API_BASE}/scoreboard?dates=${toApiDate(requestDate)}`;
-    const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+    const feedDates = [-1, 0, 1].map((offset) => {
+      const date = fromDateKey(requestDate);
+      date.setDate(date.getDate() + offset);
+      return toApiDate(toDateKey(date));
+    });
+    const responses = await Promise.all(feedDates.map((date) => fetch(
+      `${API_BASE}/scoreboard?dates=${date}&limit=1000`,
+      { cache: "no-store", signal: controller.signal },
+    )));
     if (requestDate !== selectedDate) return;
-    if (!response.ok) throw new Error(`The scores feed returned HTTP ${response.status}.`);
-    const data = await response.json();
-    if (!Array.isArray(data.events)) throw new Error("The scores feed returned an unexpected response.");
-    matches = data.events.map(normalizeMatch);
+    const payloads = await Promise.all(responses.map(async (response, index) => {
+      if (!response.ok) throw new Error(`The scores feed returned HTTP ${response.status} for ${feedDates[index]}.`);
+      const data = await response.json();
+      if (!Array.isArray(data.events)) throw new Error(`The scores feed returned an unexpected response for ${feedDates[index]}.`);
+      return data.events;
+    }));
+    const selectedDayEvents = new Map();
+    for (const event of payloads.flat()) {
+      if (event.id && event.date && toDateKey(new Date(event.date)) === requestDate) {
+        selectedDayEvents.set(String(event.id), event);
+      }
+    }
+    matches = [...selectedDayEvents.values()]
+      .sort((first, second) => new Date(first.date) - new Date(second.date))
+      .map(normalizeMatch);
     for (const match of matches) matchCache.set(match.id, match);
-    if (!selectedMatchId || !matchCache.has(selectedMatchId)) {
+    if (!selectedMatchId || !matches.some((match) => match.id === selectedMatchId)) {
       selectedMatchId = null;
       showEmptyDetail();
     }
@@ -462,10 +520,12 @@ function showEmptyDetail() {
 }
 
 function detailTeamMarkup(team) {
-  if (team.logo) {
-    return `<span class="detail-team-badge"><img src="${escapeHTML(team.logo)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()"><span>${escapeHTML(team.abbreviation)}</span></span>`;
-  }
-  return `<span class="detail-team-badge no-logo" style="--team-color:${escapeHTML(team.color)}">${escapeHTML(team.abbreviation)}</span>`;
+  const crest = team.logo
+    ? `<img src="${escapeHTML(team.logo)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`
+    : "";
+  return `<span class="detail-team-badge${team.logo ? "" : " no-logo"}" style="--team-color:${escapeHTML(team.color)}">
+    <span class="flag-fabric" aria-hidden="true"></span>${crest}<span>${escapeHTML(team.abbreviation)}</span>
+  </span>`;
 }
 
 function detailOverview(match, detail) {
@@ -768,9 +828,35 @@ searchInput.addEventListener("input", () => {
 
 document.querySelector("#refresh-button").addEventListener("click", () => loadMatches({ force: true }));
 document.querySelector("#retry-button").addEventListener("click", () => loadMatches({ force: true }));
-document.querySelector(".theme-button").addEventListener("click", () => document.body.classList.toggle("light-theme"));
+themeButton.addEventListener("click", () => setThemeMenuOpen(themeMenu.hidden));
+themeOptions.forEach((option) => {
+  option.addEventListener("click", () => {
+    applyTheme(option.dataset.themeChoice);
+    setThemeMenuOpen(false);
+    themeButton.focus();
+  });
+});
+
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".theme-picker")) setThemeMenuOpen(false);
+});
 
 document.addEventListener("keydown", (event) => {
+  if (!themeMenu.hidden) {
+    if (event.key === "Escape") {
+      setThemeMenuOpen(false);
+      themeButton.focus();
+      return;
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const currentIndex = themeOptions.indexOf(document.activeElement);
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = currentIndex === -1
+        ? (direction > 0 ? 0 : themeOptions.length - 1)
+        : (currentIndex + direction + themeOptions.length) % themeOptions.length;
+      themeOptions[nextIndex].focus();
+    }
+  }
   if (event.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
     event.preventDefault();
     searchInput.focus();
