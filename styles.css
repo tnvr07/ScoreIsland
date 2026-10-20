@@ -697,7 +697,7 @@ body.light-theme .footer-brand { color: #314337; }
 
 @media (max-width: 720px) {
   .app-shell { padding: 0 16px; }
-  .topbar { height: 64px; }
+  .topbar { height: 64px; background: var(--page); backdrop-filter: none; }
   .brand { font-size: 18px; }
   .brand-mark { width: 24px; height: 24px; }
   .main-nav {
