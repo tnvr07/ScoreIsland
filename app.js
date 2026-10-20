@@ -47,6 +47,7 @@ let searchTerm = "";
 let requestInProgress = false;
 let scoreRequestController = null;
 let selectedDetailTab = "overview";
+let selectedEventFilter = "all";
 
 function toDateKey(date) {
   const year = date.getFullYear();
@@ -283,6 +284,34 @@ function scoreMarkup(match) {
     return '<span class="score upcoming-score">VS</span>';
   }
   return `<span class="score"><span class="${match.home.winner ? "winner" : ""}">${escapeHTML(match.home.score ?? "0")}</span><span class="score-separator">:</span><span class="${match.away.winner ? "winner" : ""}">${escapeHTML(match.away.score ?? "0")}</span></span>`;
+}
+
+function detailGoalEvents(match, detail) {
+  const goals = (detail?.keyEvents ?? []).filter((item) => {
+    const type = item.type?.text || "";
+    return /goal/i.test(type) && !/overturn|disallow|no goal/i.test(type);
+  });
+  if (!goals.length) return "";
+
+  const teamGoals = (team) => goals.filter((item) =>
+    String(item.team?.id ?? "") === String(team.id)
+      || item.team?.displayName === team.name
+  ).map((item) => {
+    const shortText = item.shortText || "";
+    const scorer = shortText.replace(/\s+(?:own\s+goal|goal|penalty)\b.*$/i, "").trim()
+      || item.text?.match(/goal!?\s+[^.]*?\d+\s*,\s*[^.]*?\.\s*([^.(]+?)\s*\(/i)?.[1]?.trim()
+      || "Goal";
+    const minute = item.clock?.displayValue || item.period?.displayValue || "";
+    return `<span class="detail-goal-event"><span>${escapeHTML(scorer)}</span>${minute ? `<span class="detail-goal-minute">${escapeHTML(minute)}</span>` : ""}</span>`;
+  }).join("");
+  const homeGoals = teamGoals(match.home);
+  const awayGoals = teamGoals(match.away);
+  if (!homeGoals && !awayGoals) return "";
+  return `<div class="detail-goal-events" aria-label="Goal scorers">
+    <div class="detail-goal-team home">${homeGoals}</div>
+    <span class="detail-goal-ball" aria-hidden="true">⚽</span>
+    <div class="detail-goal-team away">${awayGoals}</div>
+  </div>`;
 }
 
 function teamBadgeMarkup(team) {
@@ -552,6 +581,7 @@ function detailTeamMarkup(team) {
 function detailOverview(match, detail) {
   const competition = detail?.header?.competitions?.[0] ?? {};
   const events = detail?.keyEvents ?? [];
+  const commentary = detail?.commentary ?? [];
   const recentGames = detail?.lastFiveGames ?? [];
   const timedEvents = events.filter((item) => item.clock?.value != null && Number.isFinite(Number(item.clock.value)));
   const momentumMarkers = timedEvents.map((item) => {
@@ -579,9 +609,60 @@ function detailOverview(match, detail) {
       </div>
       <div class="momentum-legend"><span class="home"><i></i>${escapeHTML(match.home.name)}</span><span class="away"><i></i>${escapeHTML(match.away.name)}</span></div>
     </section>`;
-  const timeline = events.length
-    ? events.map((item) => `<div class="timeline-item"><span class="timeline-minute">${escapeHTML(item.clock?.displayValue || item.period?.number || "")}</span><span class="timeline-icon">${escapeHTML(eventIcon(item.type?.text))}</span><span class="timeline-text">${escapeHTML(item.text || item.shortText || item.type?.text || "Match event")}</span></div>`).join("")
-    : '<div class="detail-placeholder">No match events have been reported yet.</div>';
+  const timelineEvents = selectedEventFilter === "key" || !commentary.length ? events : commentary;
+  const timeline = timelineEvents.length
+    ? timelineEvents.map((item) => {
+      const play = item.play ?? item;
+      const eventType = play.type?.text || item.type?.text || "";
+      const eventText = item.text || play.text || item.shortText || eventType || "Match event";
+      const eventTeamId = String(play.team?.id ?? item.team?.id ?? "");
+      const eventTeamName = play.team?.displayName || item.team?.displayName || "";
+      const side = eventTeamId === String(match.home.id) || eventTeamName === match.home.name
+        ? "home"
+        : eventTeamId === String(match.away.id) || eventTeamName === match.away.name
+          ? "away"
+          : "neutral";
+      return `<div class="timeline-item ${side}">
+        <span class="timeline-minute">${escapeHTML(item.time?.displayValue || play.clock?.displayValue || item.clock?.displayValue || item.period?.number || "")}</span>
+        <span class="timeline-icon">${escapeHTML(eventIcon(eventType, eventText))}</span>
+        <span class="timeline-text">${escapeHTML(eventText)}</span>
+      </div>`;
+    }).join("")
+    : `<div class="detail-placeholder">${selectedEventFilter === "key" ? "No key events have been reported yet." : "No match events have been reported yet."}</div>`;
+  const commentaryCount = commentary.length || events.length;
+  const shotEvents = commentary.filter((item) => {
+    const play = item.play ?? item;
+    return /shot|attempt/i.test(play.type?.text || item.type?.text || "")
+      && play.fieldPositionX != null
+      && play.fieldPositionY != null
+      && Number.isFinite(Number(play.fieldPositionX))
+      && Number.isFinite(Number(play.fieldPositionY));
+  });
+  const shotMap = shotEvents.length
+    ? `<section class="shot-map-card" aria-labelledby="shot-map-title">
+        <div class="shot-map-heading"><div><span class="momentum-kicker">REPORTED PLAY LOCATIONS</span><h3 id="shot-map-title">Shot map</h3></div><span class="shot-map-count">${shotEvents.length} attempts</span></div>
+        <p class="shot-map-note">Locations are shown only for attempts with coordinates in the ESPN event feed.</p>
+        <div class="shot-map-pitch" role="img" aria-label="${shotEvents.length} reported shot locations on the pitch">
+          <span class="shot-map-halfway" aria-hidden="true"></span><span class="shot-map-circle" aria-hidden="true"></span>
+          <span class="shot-map-box shot-map-box-left" aria-hidden="true"></span><span class="shot-map-box shot-map-box-right" aria-hidden="true"></span>
+          ${shotEvents.map((item) => {
+            const play = item.play ?? item;
+            const x = Math.min(100, Math.max(0, Number(play.fieldPositionX)));
+            const y = Math.min(100, Math.max(0, Number(play.fieldPositionY)));
+            const teamId = String(play.team?.id ?? "");
+            const teamName = play.team?.displayName || "";
+            const side = teamId === String(match.home.id) || teamName === match.home.name
+              ? "home"
+              : teamId === String(match.away.id) || teamName === match.away.name
+                ? "away"
+                : "neutral";
+            const label = item.text || play.text || play.type?.text || "Shot attempt";
+            return `<span class="shot-map-marker ${side}" style="--shot-x:${x}%;--shot-y:${y}%" title="${escapeHTML(label)}" aria-label="${escapeHTML(label)}"></span>`;
+          }).join("")}
+        </div>
+        <div class="shot-map-legend"><span class="home"><i></i>${escapeHTML(match.home.name)}</span><span class="away"><i></i>${escapeHTML(match.away.name)}</span></div>
+      </section>`
+    : "";
   const gameInfo = [
     competition.venue?.fullName || match.venue,
     [competition.venue?.address?.city || match.city, competition.venue?.address?.country || match.country].filter(Boolean).join(", "),
@@ -603,16 +684,27 @@ function detailOverview(match, detail) {
       return `<a class="news-item" href="${escapeHTML(href || "#")}"${href ? ' target="_blank" rel="noopener noreferrer"' : ""}><strong>${escapeHTML(article.headline)}</strong><span>${escapeHTML(article.description || "Read more")}</span></a>`;
     }).join("")}</div></div>`
     : "";
-  return `${momentum}<div class="detail-overview-grid">
-    <div class="detail-section"><h3>Match timeline</h3><div class="timeline">${timeline}</div></div>
+  return `${momentum}${shotMap}<div class="detail-overview-grid">
+    <div class="detail-section event-feed">
+      <div class="event-feed-heading"><h3>Match timeline</h3><span>ESPN commentary</span></div>
+      <div class="timeline-controls" role="group" aria-label="Filter match events">
+        <button class="timeline-filter${selectedEventFilter === "all" ? " active" : ""}" type="button" data-event-filter="all" aria-pressed="${selectedEventFilter === "all"}">All <span>${commentaryCount}</span></button>
+        <button class="timeline-filter${selectedEventFilter === "key" ? " active" : ""}" type="button" data-event-filter="key" aria-pressed="${selectedEventFilter === "key"}">Key events <span>${events.length}</span></button>
+      </div>
+      <div class="timeline">${timeline}</div>
+    </div>
     <div><div class="detail-section"><h3>Match information</h3><div class="info-list">${info}</div></div>${form ? `<div class="detail-section"><h3>Recent form</h3>${form}</div>` : ""}${news}</div>
   </div>`;
 }
 
-function eventIcon(type) {
-  if (/goal|score/i.test(type ?? "")) return "⚽";
-  if (/card/i.test(type ?? "")) return "▰";
-  if (/sub/i.test(type ?? "")) return "↔";
+function eventIcon(type, text = "") {
+  const label = `${type ?? ""} ${text}`;
+  if (/goal|score/i.test(label)) return "⚽";
+  if (/red card/i.test(label)) return "🟥";
+  if (/yellow card/i.test(label)) return "🟨";
+  if (/card/i.test(label)) return "▰";
+  if (/sub/i.test(label)) return "↔";
+  if (/shot|attempt|save|woodwork/i.test(label)) return "◉";
   return "•";
 }
 
@@ -813,6 +905,7 @@ function renderDetail() {
       <div class="detail-team">${detailTeamMarkup(match.home)}<strong>${escapeHTML(match.home.name)}</strong><span class="detail-record">${escapeHTML(match.home.record)}</span></div>
       <div class="detail-score">${scoreMarkup(match)}<span class="detail-clock">${match.state === "in" ? '<span class="clock-dot"></span>' : ""}${escapeHTML(match.state === "pre" ? timeLabel(match.date) : match.status)}</span></div>
       <div class="detail-team">${detailTeamMarkup(match.away)}<strong>${escapeHTML(match.away.name)}</strong><span class="detail-record">${escapeHTML(match.away.record)}</span></div>
+      ${detailGoalEvents(match, detail)}
     </div>
     <div class="detail-tabs" role="tablist" aria-label="Match details">
       ${["overview", "statistics", "lineups", "standings", "h2h"].map((tab) => `<button class="detail-tab${selectedDetailTab === tab ? " active" : ""}" type="button" role="tab" aria-selected="${selectedDetailTab === tab}" data-detail-tab="${tab}">${tab === "overview" ? "Overview" : tab === "statistics" ? "Stats" : tab === "lineups" ? "Line-ups" : tab === "standings" ? "Table" : "H2H"}</button>`).join("")}
@@ -846,6 +939,7 @@ async function loadMatchDetails(match) {
 function selectMatch(matchId) {
   selectedMatchId = matchId;
   selectedDetailTab = "overview";
+  selectedEventFilter = "all";
   renderMatches();
   renderDetail();
   const match = matchCache.get(matchId);
@@ -968,6 +1062,13 @@ detailElement.addEventListener("click", (event) => {
   if (tab) {
     selectedDetailTab = tab.dataset.detailTab;
     renderDetail();
+    return;
+  }
+  const eventFilter = event.target.closest("[data-event-filter]");
+  if (eventFilter) {
+    selectedEventFilter = eventFilter.dataset.eventFilter;
+    renderDetail();
+    detailElement.querySelector(`[data-event-filter="${selectedEventFilter}"]`)?.focus();
   }
 });
 
