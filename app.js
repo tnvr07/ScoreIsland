@@ -611,7 +611,7 @@ function detailOverview(match, detail) {
     </section>`;
   const timelineEvents = selectedEventFilter === "key" || !commentary.length ? events : commentary;
   const timeline = timelineEvents.length
-    ? timelineEvents.map((item) => {
+    ? [...timelineEvents].reverse().map((item) => {
       const play = item.play ?? item;
       const eventType = play.type?.text || item.type?.text || "";
       const eventText = item.text || play.text || item.shortText || eventType || "Match event";
@@ -884,6 +884,68 @@ function detailTabMarkup(match, detail) {
   return detailOverview(match, detail);
 }
 
+function detailBroadcastNames(match, detail, competition) {
+  const sources = [
+    detail?.broadcasts,
+    competition?.broadcasts,
+    match.broadcasts,
+  ];
+  const names = sources.flatMap((source) => {
+    const items = Array.isArray(source) ? source : source ? [source] : [];
+    return items.flatMap((item) => {
+      if (typeof item === "string") return [item];
+      if (Array.isArray(item.names)) return item.names;
+      const name = item.media?.name || item.media?.shortName || item.media?.callLetters
+        || item.name || item.shortName || item.callLetters;
+      return name ? [name] : [];
+    });
+  });
+  return [...new Set(names.map((name) => String(name).trim()).filter(Boolean))];
+}
+
+function detailMetaIcon(kind) {
+  const paths = {
+    calendar: '<path d="M7 2v2M17 2v2M3 8h18M5 4h14a2 2 0 0 1 2 2v13H3V6a2 2 0 0 1 2-2Z"/><path d="M7 12h3m4 0h3M7 16h3"/>',
+    competition: '<path d="M8 21h8m-4-4v4m-6-18h12v5a6 6 0 0 1-12 0V3Zm0 2H3v2a5 5 0 0 0 5 5m8-7h5v2a5 5 0 0 1-5 5"/>',
+    venue: '<path d="M3 21h18M5 21V5l7-3 7 3v16M9 8h.01M15 8h.01M9 12h.01M15 12h.01M10 21v-5h4v5"/>',
+    broadcast: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m8 2 4 3 4-3M8 10h8m-8 4h5"/>',
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths[kind]}</svg>`;
+}
+
+function detailMetadataMarkup(match, detail) {
+  const competition = detail?.header?.competitions?.[0] ?? {};
+  const gameInfoVenue = detail?.gameInfo?.venue ?? {};
+  const venue = gameInfoVenue.fullName || competition.venue?.fullName || match.venue;
+  const date = new Date(match.date);
+  const validDate = Number.isFinite(date.getTime());
+  const dateLabel = validDate
+    ? new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(date)
+    : "Date TBC";
+  const timeLabel = validDate
+    ? new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date)
+    : "Time TBC";
+  const leagueLogo = detail?.header?.league?.logos?.find((logo) =>
+    logo.href?.startsWith("https://")
+  )?.href;
+  const broadcasts = detailBroadcastNames(match, detail, competition);
+  const broadcastLabel = broadcasts.length
+    ? `${broadcasts.slice(0, 2).join(", ")}${broadcasts.length > 2 ? ` +${broadcasts.length - 2}` : ""}`
+    : "";
+  const broadcastTitle = broadcasts.length ? `Broadcast: ${broadcasts.join(", ")}` : "";
+  return `<div class="detail-meta" aria-label="Match information">
+    <span class="detail-meta-item detail-meta-date" aria-label="Kickoff ${escapeHTML(dateLabel)} at ${escapeHTML(timeLabel)}">
+      ${detailMetaIcon("calendar")}<span><strong>${escapeHTML(dateLabel)}</strong><small>${escapeHTML(timeLabel)}</small></span>
+    </span>
+    <span class="detail-meta-item detail-meta-competition">
+      ${leagueLogo ? `<img src="${escapeHTML(leagueLogo)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : detailMetaIcon("competition")}
+      <span>${escapeHTML(match.league)}${match.stage ? `<small>${escapeHTML(match.stage)}</small>` : ""}</span>
+    </span>
+    ${venue ? `<span class="detail-meta-item detail-meta-venue" title="${escapeHTML(venue)}">${detailMetaIcon("venue")}<span>${escapeHTML(venue)}</span></span>` : ""}
+    ${broadcastLabel ? `<span class="detail-meta-item detail-meta-broadcast" title="${escapeHTML(broadcastTitle)}">${detailMetaIcon("broadcast")}<span>${escapeHTML(broadcastLabel)}</span></span>` : ""}
+  </div>`;
+}
+
 function renderDetail() {
   const match = matchCache.get(selectedMatchId);
   if (!match) return showEmptyDetail();
@@ -898,15 +960,24 @@ function renderDetail() {
   detailElement.innerHTML = `
     <div class="detail-header">
       <button class="detail-close" type="button" data-action="close-detail" aria-label="Back to matches">← <span>Back to matches</span></button>
-      <span class="detail-competition">${escapeHTML(match.league)}${match.stage ? ` · ${escapeHTML(match.stage)}` : ""}</span>
-      <span class="detail-match-date">${escapeHTML(new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(match.date)))}</span>
+      <span class="detail-competition">Match centre</span>
     </div>
     <div class="detail-scoreboard">
-      <div class="detail-team">${detailTeamMarkup(match.home)}<strong>${escapeHTML(match.home.name)}</strong><span class="detail-record">${escapeHTML(match.home.record)}</span></div>
-      <div class="detail-score">${scoreMarkup(match)}<span class="detail-clock">${match.state === "in" ? '<span class="clock-dot"></span>' : ""}${escapeHTML(match.state === "pre" ? timeLabel(match.date) : match.status)}</span></div>
-      <div class="detail-team">${detailTeamMarkup(match.away)}<strong>${escapeHTML(match.away.name)}</strong><span class="detail-record">${escapeHTML(match.away.record)}</span></div>
+      <div class="detail-team home">
+        ${detailTeamMarkup(match.home)}
+        <span class="detail-team-copy"><strong>${escapeHTML(match.home.name)}</strong>${match.home.record ? `<span class="detail-record">${escapeHTML(match.home.record)}</span>` : ""}</span>
+      </div>
+      <div class="detail-score">
+        ${scoreMarkup(match)}
+        <span class="detail-clock">${match.state === "in" ? '<span class="clock-dot"></span>' : ""}${escapeHTML(match.state === "pre" ? timeLabel(match.date) : match.displayClock || match.status)}</span>
+      </div>
+      <div class="detail-team away">
+        <span class="detail-team-copy"><strong>${escapeHTML(match.away.name)}</strong>${match.away.record ? `<span class="detail-record">${escapeHTML(match.away.record)}</span>` : ""}</span>
+        ${detailTeamMarkup(match.away)}
+      </div>
       ${detailGoalEvents(match, detail)}
     </div>
+    ${detailMetadataMarkup(match, detail)}
     <div class="detail-tabs" role="tablist" aria-label="Match details">
       ${["overview", "statistics", "lineups", "standings", "h2h"].map((tab) => `<button class="detail-tab${selectedDetailTab === tab ? " active" : ""}" type="button" role="tab" aria-selected="${selectedDetailTab === tab}" data-detail-tab="${tab}">${tab === "overview" ? "Overview" : tab === "statistics" ? "Stats" : tab === "lineups" ? "Line-ups" : tab === "standings" ? "Table" : "H2H"}</button>`).join("")}
     </div>

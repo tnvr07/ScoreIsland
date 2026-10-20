@@ -187,13 +187,15 @@ kbd { padding: 1px 4px; border: 1px solid #383c38; border-radius: 3px; color: va
 .detail-content { padding-bottom: 13px; }
 .detail-header { min-height: 58px; padding: 13px 15px 10px; position: relative; display: flex; flex-direction: column; justify-content: center; gap: 4px; border-bottom: 1px solid var(--border-soft); }
 .detail-competition { padding-right: 24px; color: #d9ded5; font-size: 10px; font-weight: 700; }
-.detail-match-date { color: var(--faint); font: 9px var(--mono); }
 .detail-close { display: none; position: absolute; top: 9px; right: 9px; width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 50%; background: var(--panel-3); color: var(--muted); cursor: pointer; font-size: 18px; }
 .detail-scoreboard { min-height: 136px; padding: 16px 11px 13px; display: grid; grid-template-columns: minmax(0,1fr) 75px minmax(0,1fr); align-items: center; gap: 4px; border-bottom: 1px solid var(--border-soft); }
-.detail-team { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
-.detail-team > strong { max-width: 100%; overflow: hidden; font-size: 10px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.detail-team { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.detail-team.home { justify-content: flex-end; text-align: right; }
+.detail-team.away { justify-content: flex-start; text-align: left; }
+.detail-team-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.detail-team-copy > strong { overflow: hidden; font-size: 11px; line-height: 1.25; text-overflow: ellipsis; }
 .detail-record { color: var(--faint); font: 8px var(--mono); }
-.detail-team-badge { width: 37px; height: 37px; position: relative; display: grid; place-items: center; border: 1px solid #3b403a; border-radius: 50%; background: #242724; color: #d7dcd3; font: 9px var(--mono); }
+.detail-team-badge { width: 42px; height: 42px; flex: none; position: relative; display: grid; place-items: center; border: 1px solid #3b403a; border-radius: 50%; background: #242724; color: #d7dcd3; font: 9px var(--mono); }
 .detail-team-badge img { position: absolute; width: 26px; height: 26px; object-fit: contain; }
 .detail-team-badge.no-logo { border-color: color-mix(in srgb, var(--team-color), transparent 30%); background: color-mix(in srgb, var(--team-color), #171917 72%); }
 .detail-score { display: flex; flex-direction: column; align-items: center; gap: 6px; }
@@ -209,6 +211,18 @@ kbd { padding: 1px 4px; border: 1px solid #383c38; border-radius: 3px; color: va
 .detail-goal-team.away .detail-goal-event { justify-content: flex-start; text-align: left; }
 .detail-goal-minute { flex: none; color: var(--faint); font: 9px var(--mono); }
 .detail-goal-ball { color: var(--faint); font-size: 13px; line-height: 1.1; text-align: center; }
+.detail-meta { padding: 10px 12px 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; border-bottom: 1px solid var(--border-soft); }
+.detail-meta-item { min-width: 0; min-height: 30px; padding: 5px 8px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border-soft); border-radius: 7px; background: color-mix(in srgb, var(--panel-2), transparent 30%); color: var(--muted); font-size: 9px; line-height: 1.25; }
+.detail-meta-item > svg { width: 15px; height: 15px; flex: none; color: var(--faint); }
+.detail-meta-item > img { width: 17px; height: 17px; flex: none; object-fit: contain; }
+.detail-meta-item > span { min-width: 0; }
+.detail-meta-date { gap: 6px; }
+.detail-meta-date > span { display: flex; flex-direction: column; gap: 1px; }
+.detail-meta-date strong { color: var(--text); font-size: 9px; font-weight: 600; }
+.detail-meta-date small, .detail-meta-competition small { display: block; color: var(--faint); font-size: 8px; }
+.detail-meta-competition { color: var(--text); font-weight: 600; }
+.detail-meta-venue > span, .detail-meta-broadcast > span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-meta-broadcast { color: var(--text); }
 .detail-tabs { min-height: 43px; padding: 0 8px; display: flex; align-items: stretch; gap: 2px; border-bottom: 1px solid var(--border-soft); }
 .detail-tab { position: relative; padding: 0 8px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 9px; font-weight: 600; }
 .detail-tab:hover, .detail-tab.active { color: var(--text); }
@@ -614,27 +628,34 @@ body.detail-open .detail-close {
 }
 body.detail-open .detail-close span { font-size: 11px; }
 body.detail-open .detail-competition { padding-right: 0; font-size: 12px; }
-body.detail-open .detail-match-date { margin-left: auto; font-size: 10px; }
 body.detail-open .detail-scoreboard {
-  min-height: 248px;
-  padding: 34px 36px;
+  min-height: 166px;
+  padding: 23px 36px 18px;
   grid-template-columns: minmax(0,1fr) minmax(140px,200px) minmax(0,1fr);
-  gap: 20px;
+  gap: 14px;
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   background: linear-gradient(130deg, color-mix(in srgb, var(--panel), transparent 8%), var(--panel));
-  margin-top: 22px;
+  margin-top: 18px;
 }
-body.detail-open .detail-team { gap: 11px; }
-body.detail-open .detail-team > strong { font-size: 17px; }
-body.detail-open .detail-record { font-size: 10px; }
-body.detail-open .detail-team-badge { width: 70px; height: 70px; }
-body.detail-open .detail-team-badge img { width: 50px; height: 50px; }
+body.detail-open .detail-team { gap: 12px; }
+body.detail-open .detail-team-copy { gap: 5px; }
+body.detail-open .detail-team-copy > strong { font-size: 16px; }
+body.detail-open .detail-record { font-size: 9px; }
+body.detail-open .detail-team-badge { width: 54px; height: 54px; }
+body.detail-open .detail-team-badge img { width: 39px; height: 39px; }
 body.detail-open .detail-score { gap: 12px; }
-body.detail-open .detail-score .score { gap: 13px; font-size: 50px; }
-body.detail-open .detail-score .score-separator { font-size: 34px; }
-body.detail-open .detail-score .upcoming-score { font-size: 27px; }
+body.detail-open .detail-score .score { gap: 11px; font-size: 43px; }
+body.detail-open .detail-score .score-separator { font-size: 30px; }
+body.detail-open .detail-score .upcoming-score { font-size: 25px; }
 body.detail-open .detail-clock { font-size: 11px; }
+body.detail-open .detail-meta { padding: 14px 18px 16px; gap: 8px; }
+body.detail-open .detail-meta-item { min-height: 36px; padding: 6px 11px; gap: 8px; font-size: 11px; }
+body.detail-open .detail-meta-item > svg { width: 17px; height: 17px; }
+body.detail-open .detail-meta-item > img { width: 19px; height: 19px; }
+body.detail-open .detail-meta-date strong { font-size: 10px; }
+body.detail-open .detail-meta-date small, body.detail-open .detail-meta-competition small { font-size: 9px; }
+body.detail-open .detail-meta-venue > span, body.detail-open .detail-meta-broadcast > span { max-width: 245px; }
 body.detail-open .detail-goal-events { grid-template-columns: minmax(0,1fr) 24px minmax(0,1fr); }
 body.detail-open .detail-goal-event { font-size: 11px; }
 body.detail-open .detail-goal-minute { font-size: 10px; }
@@ -733,20 +754,25 @@ body.neon-theme .detail-scoreboard { border-color: rgba(128,110,241,.35); backgr
   body.detail-open .detail-close { width: 34px; height: 34px; padding: 0; font-size: 18px; }
   body.detail-open .detail-close span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   body.detail-open .detail-competition { max-width: 45%; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-  body.detail-open .detail-match-date { font-size: 8px; text-align: right; }
-  body.detail-open .detail-scoreboard { min-height: 190px; padding: 22px 8px; grid-template-columns: minmax(0,1fr) 80px minmax(0,1fr); gap: 4px; margin-top: 12px; }
-  body.detail-open .detail-team { gap: 8px; }
-  body.detail-open .detail-team > strong { font-size: 11px; }
-  body.detail-open .detail-team-badge { width: 48px; height: 48px; }
-  body.detail-open .detail-team-badge img { width: 34px; height: 34px; }
+  body.detail-open .detail-scoreboard { min-height: 147px; padding: 18px 8px 13px; grid-template-columns: minmax(0,1fr) 72px minmax(0,1fr); gap: 4px; margin-top: 12px; }
+  body.detail-open .detail-team { gap: 6px; }
+  body.detail-open .detail-team-copy { gap: 3px; }
+  body.detail-open .detail-team-copy > strong { font-size: 10px; }
+  body.detail-open .detail-team-badge { width: 38px; height: 38px; }
+  body.detail-open .detail-team-badge img { width: 28px; height: 28px; }
   body.detail-open .detail-record { font-size: 8px; }
-  body.detail-open .detail-score .score { gap: 7px; font-size: 31px; }
-  body.detail-open .detail-score .score-separator { font-size: 21px; }
+  body.detail-open .detail-score .score { gap: 6px; font-size: 29px; }
+  body.detail-open .detail-score .score-separator { font-size: 20px; }
   body.detail-open .detail-clock { font-size: 8px; }
   body.detail-open .detail-goal-events { grid-template-columns: minmax(0,1fr) 18px minmax(0,1fr); gap: 4px; }
   body.detail-open .detail-goal-team { gap: 4px; }
   body.detail-open .detail-goal-event { gap: 3px; font-size: 9px; }
   body.detail-open .detail-goal-minute { font-size: 8px; }
+  body.detail-open .detail-meta { padding: 10px 4px 12px; gap: 6px; }
+  body.detail-open .detail-meta-item { min-height: 32px; padding: 5px 7px; gap: 5px; font-size: 9px; }
+  body.detail-open .detail-meta-item > svg { width: 14px; height: 14px; }
+  body.detail-open .detail-meta-item > img { width: 15px; height: 15px; }
+  body.detail-open .detail-meta-venue > span, body.detail-open .detail-meta-broadcast > span { max-width: min(145px, 38vw); }
   body.detail-open .detail-tabs { top: 58px; min-height: 46px; justify-content: space-between; gap: 0; margin-top: 12px; }
   body.detail-open .detail-tab { padding: 0 7px; font-size: 10px; }
   body.detail-open .detail-overview-grid { grid-template-columns: minmax(0,1fr); gap: 0; }
@@ -1111,7 +1137,6 @@ h1 { font-size: clamp(40px, 4.2vw, 55px); letter-spacing: -2.5px; }
 .detail-empty { min-height: 388px; }
 .detail-header { min-height: 67px; padding: 15px 18px 12px; }
 .detail-competition { font-size: 12px; }
-.detail-match-date { font-size: 10px; }
 .detail-scoreboard { min-height: 160px; grid-template-columns: minmax(0,1fr) 88px minmax(0,1fr); }
 .detail-team > strong { font-size: 12px; }
 .detail-team-badge { width: 46px; height: 46px; }
