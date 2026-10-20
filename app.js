@@ -40,6 +40,7 @@ const detailCache = new Map();
 const currentDate = new Date();
 let selectedDate = toDateKey(currentDate);
 let matches = [];
+let liveScoreMatches = [];
 let selectedMatchId = null;
 let activeStatus = "all";
 let activeCompetition = "all";
@@ -407,6 +408,45 @@ function renderLiveBoard() {
   }).join("");
 }
 
+function renderLiveScoreStrip() {
+  const strip = document.querySelector("#live-score-strip");
+  const track = document.querySelector("#live-score-strip-track");
+  const count = document.querySelector("#live-score-strip-count");
+  const liveMatches = liveScoreMatches
+    .filter(({ state }) => state === "in")
+    .sort((a, b) => compareCompetitionPriority(a, b) || new Date(a.date) - new Date(b.date));
+  strip.hidden = liveMatches.length === 0;
+  count.textContent = liveMatches.length;
+  track.innerHTML = liveMatches.map((match) => {
+    const home = match.home.shortName || match.home.name;
+    const away = match.away.shortName || match.away.name;
+    const homeCrest = match.home.logo
+      ? `<img src="${escapeHTML(match.home.logo)}" alt="" loading="lazy">`
+      : `<span class="live-score-item-initials">${escapeHTML(home.slice(0, 2))}</span>`;
+    const awayCrest = match.away.logo
+      ? `<img src="${escapeHTML(match.away.logo)}" alt="" loading="lazy">`
+      : `<span class="live-score-item-initials">${escapeHTML(away.slice(0, 2))}</span>`;
+    return `<button class="live-score-item" type="button" data-live-strip-match="${escapeHTML(match.id)}" aria-label="Open ${escapeHTML(match.home.name)} ${escapeHTML(match.home.score ?? "0")}–${escapeHTML(match.away.score ?? "0")} ${escapeHTML(match.away.name)}, ${escapeHTML(match.displayClock || match.status)}">
+      <span class="live-score-item-league">${escapeHTML(match.league)}</span>
+      <span class="live-score-item-match">
+        <span class="live-score-item-team">${homeCrest}<span>${escapeHTML(home)}</span></span>
+        <strong class="live-score-item-score">${escapeHTML(match.home.score ?? "0")}<span>–</span>${escapeHTML(match.away.score ?? "0")}</strong>
+        <span class="live-score-item-team away">${awayCrest}<span>${escapeHTML(away)}</span></span>
+      </span>
+      <span class="live-score-item-clock"><span class="clock-dot"></span>${escapeHTML(match.displayClock || match.status)}</span>
+    </button>`;
+  }).join("");
+  updateLiveScoreArrows();
+}
+
+function updateLiveScoreArrows() {
+  const track = document.querySelector("#live-score-strip-track");
+  const previous = document.querySelector('[data-live-scroll="-1"]');
+  const next = document.querySelector('[data-live-scroll="1"]');
+  previous.disabled = track.scrollLeft <= 0;
+  next.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
+}
+
 function renderMatches() {
   const filtered = visibleMatches().sort((a, b) => {
     const stateOrder = { in: 0, pre: 1, post: 2 };
@@ -451,6 +491,7 @@ function renderMatches() {
   renderCompetitionFilters();
   renderDates();
   renderLiveBoard();
+  renderLiveScoreStrip();
 }
 
 function setActiveStatus(status) {
@@ -488,11 +529,15 @@ async function loadMatches({ force = false } = {}) {
   setFeedStatus("loading", "UPDATING SCORES");
   document.querySelector("#error-banner").hidden = true;
   try {
-    const feedDates = [-1, 0, 1].map((offset) => {
-      const date = fromDateKey(requestDate);
-      date.setDate(date.getDate() + offset);
-      return toApiDate(toDateKey(date));
-    });
+    const feedDateKeys = new Set();
+    for (const baseDateKey of new Set([requestDate, toDateKey(new Date())])) {
+      for (let offset = -1; offset <= 1; offset += 1) {
+        const date = fromDateKey(baseDateKey);
+        date.setDate(date.getDate() + offset);
+        feedDateKeys.add(toDateKey(date));
+      }
+    }
+    const feedDates = [...feedDateKeys].map(toApiDate);
     const responses = await Promise.all(feedDates.map((date) => fetch(
       `${API_BASE}/scoreboard?dates=${date}&limit=1000`,
       { cache: "no-store", signal: controller.signal },
@@ -505,15 +550,21 @@ async function loadMatches({ force = false } = {}) {
       return data.events;
     }));
     const selectedDayEvents = new Map();
+    const currentDayEvents = new Map();
+    const todayKey = toDateKey(new Date());
     for (const event of payloads.flat()) {
       if (event.id && event.date && toDateKey(new Date(event.date)) === requestDate) {
         selectedDayEvents.set(String(event.id), event);
+      }
+      if (event.id && event.date && toDateKey(new Date(event.date)) === todayKey) {
+        currentDayEvents.set(String(event.id), event);
       }
     }
     matches = [...selectedDayEvents.values()]
       .sort((first, second) => new Date(first.date) - new Date(second.date))
       .map(normalizeMatch);
-    for (const match of matches) matchCache.set(match.id, match);
+    liveScoreMatches = [...currentDayEvents.values()].map(normalizeMatch);
+    for (const match of [...matches, ...liveScoreMatches]) matchCache.set(match.id, match);
     if (!selectedMatchId || !matches.some((match) => match.id === selectedMatchId)) {
       selectedMatchId = null;
       showEmptyDetail();
@@ -578,11 +629,8 @@ function detailTeamMarkup(team) {
   </span>`;
 }
 
-function detailOverview(match, detail) {
-  const competition = detail?.header?.competitions?.[0] ?? {};
+function detailMomentum(match, detail) {
   const events = detail?.keyEvents ?? [];
-  const commentary = detail?.commentary ?? [];
-  const recentGames = detail?.lastFiveGames ?? [];
   const timedEvents = events.filter((item) => item.clock?.value != null && Number.isFinite(Number(item.clock.value)));
   const momentumMarkers = timedEvents.map((item) => {
     const eventTeamId = String(item.team?.id ?? "");
@@ -594,9 +642,9 @@ function detailOverview(match, detail) {
         : "neutral";
     const position = Math.min(99, Math.max(1, (Number(item.clock.value) / 5400) * 100));
     const eventLabel = item.text || item.shortText || item.type?.text || "Match event";
-    return `<span class="momentum-marker ${side}" style="--event-position:${position}%" title="${escapeHTML(eventLabel)}" aria-label="${escapeHTML(eventLabel)}">${escapeHTML(eventIcon(item.type?.text))}</span>`;
+    return `<span class="momentum-marker ${side}" style="--event-position:${position}%" title="${escapeHTML(eventLabel)}" aria-label="${escapeHTML(eventLabel)}">${escapeHTML(eventIcon(item.type?.text, eventLabel))}</span>`;
   }).join("");
-  const momentum = `<section class="momentum-card" aria-labelledby="momentum-title">
+  return `<section class="momentum-card" aria-labelledby="momentum-title">
       <div class="momentum-heading"><div><span class="momentum-kicker">MATCH FLOW</span><h3 id="momentum-title">Match momentum</h3></div><span class="momentum-unavailable">Pressure data unavailable</span></div>
       <p class="momentum-note">ESPN does not provide attack-pressure data for this fixture. This clock shows reported key events only; no momentum curve is inferred.</p>
       <div class="momentum-chart" role="img" aria-label="Reported match events on the match clock. Attack-pressure data is not available.">
@@ -609,6 +657,12 @@ function detailOverview(match, detail) {
       </div>
       <div class="momentum-legend"><span class="home"><i></i>${escapeHTML(match.home.name)}</span><span class="away"><i></i>${escapeHTML(match.away.name)}</span></div>
     </section>`;
+}
+
+function detailOverview(match, detail) {
+  const events = detail?.keyEvents ?? [];
+  const commentary = detail?.commentary ?? [];
+  const recentGames = detail?.lastFiveGames ?? [];
   const timelineEvents = selectedEventFilter === "key" || !commentary.length ? events : commentary;
   const timeline = timelineEvents.length
     ? [...timelineEvents].reverse().map((item) => {
@@ -663,9 +717,10 @@ function detailOverview(match, detail) {
         <div class="shot-map-legend"><span class="home"><i></i>${escapeHTML(match.home.name)}</span><span class="away"><i></i>${escapeHTML(match.away.name)}</span></div>
       </section>`
     : "";
+  const competition = detail?.header?.competitions?.[0] ?? {};
   const gameInfo = [
-    competition.venue?.fullName || match.venue,
-    [competition.venue?.address?.city || match.city, competition.venue?.address?.country || match.country].filter(Boolean).join(", "),
+    detail?.gameInfo?.venue?.fullName || competition.venue?.fullName || match.venue,
+    [detail?.gameInfo?.venue?.address?.city || competition.venue?.address?.city || match.city, detail?.gameInfo?.venue?.address?.country || competition.venue?.address?.country || match.country].filter(Boolean).join(", "),
     competition.attendance ? `Attendance ${Number(competition.attendance).toLocaleString()}` : "",
     competition.broadcasts?.flatMap((item) => item.names ?? []).join(", ") || match.broadcasts.join(", "),
   ].filter(Boolean);
@@ -684,7 +739,7 @@ function detailOverview(match, detail) {
       return `<a class="news-item" href="${escapeHTML(href || "#")}"${href ? ' target="_blank" rel="noopener noreferrer"' : ""}><strong>${escapeHTML(article.headline)}</strong><span>${escapeHTML(article.description || "Read more")}</span></a>`;
     }).join("")}</div></div>`
     : "";
-  return `${momentum}${shotMap}<div class="detail-overview-grid">
+  return `${shotMap}<div class="detail-overview-grid">
     <div class="detail-section event-feed">
       <div class="event-feed-heading"><h3>Match timeline</h3><span>ESPN commentary</span></div>
       <div class="timeline-controls" role="group" aria-label="Filter match events">
@@ -778,12 +833,33 @@ function lineupFormationRows(roster) {
   return { goalkeeper, rows: [defensiveLine, ...rows, attackingLine].filter((row) => row.length) };
 }
 
+function lineupPlayerRating(player) {
+  const ratingStat = Array.isArray(player.stats)
+    ? player.stats.find((stat) => stat.name === "rating")
+    : null;
+  const rawRating = player.rating ?? ratingStat?.displayValue ?? ratingStat?.value;
+  const value = Number(typeof rawRating === "object" && rawRating !== null
+    ? rawRating.displayValue ?? rawRating.value
+    : rawRating);
+  if (!Number.isFinite(value) || value < 0 || value > 10) return null;
+  const sourceDisplay = player.rating !== undefined && player.rating !== null
+    ? (typeof rawRating === "object" && rawRating !== null ? rawRating.displayValue : null)
+    : ratingStat?.displayValue;
+  const display = sourceDisplay !== undefined && sourceDisplay !== null && sourceDisplay !== ""
+    ? String(sourceDisplay)
+    : String(Number(value.toFixed(2)));
+  return { value, display };
+}
+
 function lineupPlayerMarkup(player, color) {
   const name = player.athlete?.displayName || player.athlete?.shortName || "Player";
   const number = player.jersey?.displayValue || player.jersey || "—";
   const position = player.position?.abbreviation || "";
+  const rating = lineupPlayerRating(player);
+  const ratingTier = rating ? (rating.value >= 7.5 ? "high" : rating.value >= 6.5 ? "medium" : "low") : "";
   return `<div class="pitch-player" title="${escapeHTML(`${number} ${name}${position ? ` · ${position}` : ""}`)}">
     <span class="pitch-shirt" style="--shirt-color:${color}" aria-hidden="true"><span>${escapeHTML(number)}</span></span>
+    ${rating ? `<span class="pitch-rating pitch-rating-${ratingTier}" aria-label="Player rating: ${escapeHTML(rating.display)} out of 10" title="Rating ${escapeHTML(rating.display)}">${escapeHTML(rating.display)}</span>` : ""}
     <span class="pitch-player-name">${escapeHTML(name)}</span>
     ${position ? `<span class="pitch-player-position">${escapeHTML(position)}</span>` : ""}
   </div>`;
@@ -800,8 +876,17 @@ function lineupTeamPitch(roster, side) {
   const keeper = `<div class="pitch-line pitch-goalkeeper">${lineupPlayerMarkup(formation.goalkeeper, color)}</div>`;
   const teamLines = side === "home" ? [...lines, keeper] : [keeper, ...lines];
   return `<div class="pitch-team pitch-team-${side}" aria-label="${escapeHTML(roster.team?.displayName || side)} line-up">
-    <div class="pitch-team-heading"><strong>${escapeHTML(roster.team?.displayName || (side === "home" ? "Home" : "Away"))}</strong><span>${escapeHTML(roster.formation || "Formation unavailable")}</span></div>
     <div class="pitch-players">${teamLines.join("")}</div>
+  </div>`;
+}
+
+function lineupTeamSummary(roster, side) {
+  const color = side === "home" ? "#63d6b3" : "#ff9a76";
+  const teamName = roster.team?.displayName || (side === "home" ? "Home" : "Away");
+  return `<div class="lineup-team-summary lineup-team-summary-${side}">
+    <span class="lineup-summary-shirt" style="--shirt-color:${color}" aria-hidden="true"></span>
+    <span class="lineup-summary-name"><strong>${escapeHTML(teamName)}</strong><small>${side === "home" ? "HOME" : "AWAY"}</small></span>
+    <span class="lineup-summary-formation">${escapeHTML(roster.formation || "—")}</span>
   </div>`;
 }
 
@@ -829,11 +914,19 @@ function detailLineups(detail) {
   if (!homePitch || !awayPitch) {
     return '<div class="detail-placeholder">Confirmed starting line-ups are not available for this match yet.</div>';
   }
+  const hasPlayerRatings = [home, away].some((roster) => (roster.roster ?? [])
+    .some((player) => player.starter && lineupPlayerRating(player)));
+  const ratingNote = hasPlayerRatings
+    ? "Ratings shown only when provided in the match feed."
+    : "Player ratings are not provided in the ESPN match feed for this match.";
   return `<div class="lineup-view">
-    <div class="lineup-legend"><span><i class="home-legend"></i>${escapeHTML(home.team?.displayName || "Home")}</span><span><i class="away-legend"></i>${escapeHTML(away.team?.displayName || "Away")}</span></div>
-    <div class="lineup-pitch" role="group" aria-label="Starting line-ups on a football pitch">
-      <div class="pitch-markings" aria-hidden="true"></div>
-      ${awayPitch}${homePitch}
+    <div class="lineup-team-summaries">${lineupTeamSummary(away, "away")}${lineupTeamSummary(home, "home")}</div>
+    <p class="lineup-rating-note">${escapeHTML(ratingNote)}</p>
+    <div class="lineup-pitch-scroll" role="region" aria-label="Scrollable football pitch line-ups" tabindex="0">
+      <div class="lineup-pitch" role="group" aria-label="Starting line-ups on a football pitch">
+        <div class="pitch-markings" aria-hidden="true"><span class="pitch-box pitch-box-away"></span><span class="pitch-box pitch-box-home"></span><span class="pitch-goal-area pitch-goal-area-away"></span><span class="pitch-goal-area pitch-goal-area-home"></span></div>
+        ${awayPitch}${homePitch}
+      </div>
     </div>
     <div class="bench-heading"><span>SUBSTITUTES</span><span>Players not in the starting line-up</span></div>
     <div class="lineup-benches">${lineupBench(home, "home")}${lineupBench(away, "away")}</div>
@@ -978,6 +1071,11 @@ function renderDetail() {
       ${detailGoalEvents(match, detail)}
     </div>
     ${detailMetadataMarkup(match, detail)}
+    ${detail && !detail.error
+      ? detailMomentum(match, detail)
+      : !detail
+        ? '<section class="momentum-card momentum-loading" aria-label="Loading match momentum"><div class="momentum-heading"><div><span class="momentum-kicker">MATCH FLOW</span><h3>Match momentum</h3></div></div><div class="momentum-loading-state"><span class="loading-spinner" aria-hidden="true"></span>Loading reported match events…</div></section>'
+        : ""}
     <div class="detail-tabs" role="tablist" aria-label="Match details">
       ${["overview", "statistics", "lineups", "standings", "h2h"].map((tab) => `<button class="detail-tab${selectedDetailTab === tab ? " active" : ""}" type="button" role="tab" aria-selected="${selectedDetailTab === tab}" data-detail-tab="${tab}">${tab === "overview" ? "Overview" : tab === "statistics" ? "Stats" : tab === "lineups" ? "Line-ups" : tab === "standings" ? "Table" : "H2H"}</button>`).join("")}
     </div>
@@ -1112,6 +1210,22 @@ document.querySelector("#live-board-grid").addEventListener("click", (event) => 
   const card = event.target.closest("[data-live-match]");
   if (card) selectMatch(card.dataset.liveMatch);
 });
+
+const liveScoreTrack = document.querySelector("#live-score-strip-track");
+liveScoreTrack.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-live-strip-match]");
+  if (item) selectMatch(item.dataset.liveStripMatch);
+});
+liveScoreTrack.addEventListener("scroll", updateLiveScoreArrows, { passive: true });
+document.querySelector(".live-score-strip").addEventListener("click", (event) => {
+  const arrow = event.target.closest("[data-live-scroll]");
+  if (!arrow) return;
+  liveScoreTrack.scrollBy({
+    left: Number(arrow.dataset.liveScroll) * Math.max(220, liveScoreTrack.clientWidth * 0.75),
+    behavior: "smooth",
+  });
+});
+window.addEventListener("resize", updateLiveScoreArrows);
 
 document.querySelector("#live-board").addEventListener("click", (event) => {
   const viewButton = event.target.closest("[data-view]");

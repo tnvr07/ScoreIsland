@@ -21,9 +21,11 @@ The feed covers many competitions around the world, but it does not guarantee ev
 ## Features
 
 - Browse dates, search fixtures, and filter by match status or competition.
+- Follow every live match in the horizontally scrollable header score strip; it stays current when browsing another date and opens each match centre.
 - Choose between Aurora, Neon, and Daylight color themes; your selection is saved in the browser.
 - Find fixtures with broadcast information listed in the feed; broadcast availability is region-dependent.
 - Follow matches; favorites persist in the browser.
 - Open a full match centre with kickoff, competition, venue and broadcast metadata; the scoreboard, reported goal scorers, all/key-event commentary filters, an ESPN-coordinate shot map when event locations are available, statistics, formation-pitch line-ups and substitutes, and standings.
+- Show rating badges on lineup players only when the ESPN match feed supplies explicit ratings; otherwise, the lineup explains that ratings are unavailable rather than estimating them.
 - Match momentum is shown only when a source provides time-series pressure data; the current ESPN feed supplies key-event timestamps instead, which are displayed without fabricating a momentum curve.
 - Refresh scores automatically or on demand; unavailable feed data is shown as an error rather than replaced with sample scores.

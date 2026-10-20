@@ -11,33 +11,45 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="topbar">
-        <a class="brand" href="#" aria-label="Touchline home">
-          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
-          <span>touchline<span class="brand-period">.</span></span>
-        </a>
-        <nav class="main-nav" aria-label="Main navigation">
-          <button class="nav-link active" type="button" data-view="all">Scores</button>
-          <button class="nav-link" type="button" data-view="live">Live</button>
-          <button class="nav-link" type="button" data-view="favorites">Following</button>
-          <button class="nav-link" type="button" data-view="finished">Results</button>
-        </nav>
-        <div class="topbar-right">
-          <span class="feed-status loading" id="feed-status"><span class="status-dot"></span><span id="feed-status-text">CONNECTING TO SCORES</span></span>
-          <div class="theme-picker">
-            <button class="icon-button theme-button" id="theme-button" type="button" aria-label="Choose color theme" aria-haspopup="menu" aria-expanded="false" aria-controls="theme-menu" title="Choose color theme">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.1 2.1 0 0 0 1.5-3.6 1.5 1.5 0 0 1 1.1-2.5H18a3 3 0 0 0 3-3c0-5-4-8.9-9-8.9Z"></path><circle cx="7.5" cy="11" r="1"></circle><circle cx="10" cy="7.5" r="1"></circle><circle cx="14.5" cy="8" r="1"></circle><circle cx="17" cy="11.5" r="1"></circle></svg>
-              <span class="theme-current">Aurora</span>
-              <svg class="theme-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"></path></svg>
-            </button>
-            <div class="theme-menu" id="theme-menu" role="menu" aria-label="Color themes" hidden>
-              <span class="theme-menu-label">APPEARANCE</span>
-              <button type="button" role="menuitemradio" aria-checked="true" data-theme-choice="aurora"><span class="theme-swatch aurora-swatch"></span>Aurora<span class="theme-check" aria-hidden="true">✓</span></button>
-              <button type="button" role="menuitemradio" aria-checked="false" data-theme-choice="neon"><span class="theme-swatch neon-swatch"></span>Neon<span class="theme-check" aria-hidden="true">✓</span></button>
-              <button type="button" role="menuitemradio" aria-checked="false" data-theme-choice="light"><span class="theme-swatch light-swatch"></span>Daylight<span class="theme-check" aria-hidden="true">✓</span></button>
+      <header class="site-header">
+        <div class="topbar">
+          <a class="brand" href="#" aria-label="Touchline home">
+            <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+            <span>touchline<span class="brand-period">.</span></span>
+          </a>
+          <nav class="main-nav" aria-label="Main navigation">
+            <button class="nav-link active" type="button" data-view="all">Scores</button>
+            <button class="nav-link" type="button" data-view="live">Live</button>
+            <button class="nav-link" type="button" data-view="favorites">Following</button>
+            <button class="nav-link" type="button" data-view="finished">Results</button>
+          </nav>
+          <div class="topbar-right">
+            <span class="feed-status loading" id="feed-status"><span class="status-dot"></span><span id="feed-status-text">CONNECTING TO SCORES</span></span>
+            <div class="theme-picker">
+              <button class="icon-button theme-button" id="theme-button" type="button" aria-label="Choose color theme" aria-haspopup="menu" aria-expanded="false" aria-controls="theme-menu" title="Choose color theme">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.1 2.1 0 0 0 1.5-3.6 1.5 1.5 0 0 1 1.1-2.5H18a3 3 0 0 0 3-3c0-5-4-8.9-9-8.9Z"></path><circle cx="7.5" cy="11" r="1"></circle><circle cx="10" cy="7.5" r="1"></circle><circle cx="14.5" cy="8" r="1"></circle><circle cx="17" cy="11.5" r="1"></circle></svg>
+                <span class="theme-current">Aurora</span>
+                <svg class="theme-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"></path></svg>
+              </button>
+              <div class="theme-menu" id="theme-menu" role="menu" aria-label="Color themes" hidden>
+                <span class="theme-menu-label">APPEARANCE</span>
+                <button type="button" role="menuitemradio" aria-checked="true" data-theme-choice="aurora"><span class="theme-swatch aurora-swatch"></span>Aurora<span class="theme-check" aria-hidden="true">✓</span></button>
+                <button type="button" role="menuitemradio" aria-checked="false" data-theme-choice="neon"><span class="theme-swatch neon-swatch"></span>Neon<span class="theme-check" aria-hidden="true">✓</span></button>
+                <button type="button" role="menuitemradio" aria-checked="false" data-theme-choice="light"><span class="theme-swatch light-swatch"></span>Daylight<span class="theme-check" aria-hidden="true">✓</span></button>
+              </div>
             </div>
           </div>
         </div>
+        <section class="live-score-strip" id="live-score-strip" aria-label="Live football scores" hidden>
+          <div class="live-score-strip-heading">
+            <span class="live-score-strip-indicator" aria-hidden="true"><span></span></span>
+            <span>LIVE</span>
+            <span class="live-score-strip-count" id="live-score-strip-count">0</span>
+          </div>
+          <button class="live-score-strip-arrow" type="button" data-live-scroll="-1" aria-label="Scroll live scores left" disabled>‹</button>
+          <div class="live-score-strip-track" id="live-score-strip-track" role="region" aria-label="Live matches" tabindex="0"></div>
+          <button class="live-score-strip-arrow" type="button" data-live-scroll="1" aria-label="Scroll live scores right">›</button>
+        </section>
       </header>
 
       <main id="scores">
