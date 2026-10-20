@@ -24,7 +24,7 @@
         </nav>
         <div class="topbar-right">
           <span class="feed-status loading" id="feed-status"><span class="status-dot"></span><span id="feed-status-text">CONNECTING TO SCORES</span></span>
-          <button class="icon-button theme-button" type="button" aria-label="Toggle color theme" title="Toggle color theme">
+          <button class="icon-button theme-button" type="button" aria-label="Toggle color theme" aria-pressed="false" title="Switch to light theme">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>
           </button>
         </div>
@@ -119,6 +119,7 @@
             </div>
           </section>
 
+          <div class="detail-backdrop" id="detail-backdrop" hidden></div>
           <aside class="match-panel" id="match-panel" aria-label="Selected match details">
             <div class="detail-empty" id="detail-empty">
               <span class="detail-empty-ball" aria-hidden="true">⚽</span>

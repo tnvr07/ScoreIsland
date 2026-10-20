@@ -33,8 +33,10 @@ const listElement = document.querySelector("#match-list");
 const competitionListElement = document.querySelector("#competition-list");
 const searchInput = document.querySelector("#match-search");
 const datePicker = document.querySelector("#date-picker");
+const themeButton = document.querySelector(".theme-button");
 const detailElement = document.querySelector("#detail-content");
 const detailEmptyElement = document.querySelector("#detail-empty");
+const detailBackdrop = document.querySelector("#detail-backdrop");
 const matchCache = new Map();
 const detailCache = new Map();
 const currentDate = new Date();
@@ -104,6 +106,19 @@ function setFeedStatus(state, text) {
   const element = document.querySelector("#feed-status");
   element.className = `feed-status ${state}`;
   document.querySelector("#feed-status-text").textContent = text;
+}
+
+function setTheme(theme, persist = false) {
+  const isLight = theme === "light";
+  document.body.classList.toggle("light-theme", isLight);
+  themeButton.setAttribute("aria-pressed", String(isLight));
+  themeButton.title = isLight ? "Switch to dark theme" : "Switch to light theme";
+  if (!persist) return;
+  try {
+    localStorage.setItem("touchline-theme", isLight ? "light" : "dark");
+  } catch (error) {
+    console.error("Could not save the color theme.", error);
+  }
 }
 
 function timeLabel(isoDate) {
@@ -415,6 +430,14 @@ function showEmptyDetail() {
   detailElement.hidden = true;
   detailElement.innerHTML = "";
   document.querySelector("#match-panel").classList.remove("mobile-open");
+  document.body.classList.remove("detail-open");
+  detailBackdrop.hidden = true;
+}
+
+function closeDetail() {
+  selectedMatchId = null;
+  showEmptyDetail();
+  renderMatches();
 }
 
 function detailTeamMarkup(team) {
@@ -565,6 +588,8 @@ function renderDetail() {
       ${favorites.has(match.id) ? "Following match" : "Follow match"}
     </button>`;
   document.querySelector("#match-panel").classList.add("mobile-open");
+  document.body.classList.add("detail-open");
+  detailBackdrop.hidden = false;
 }
 
 async function loadMatchDetails(match) {
@@ -687,8 +712,7 @@ listElement.addEventListener("click", (event) => {
 detailElement.addEventListener("click", (event) => {
   const closeButton = event.target.closest('[data-action="close-detail"]');
   if (closeButton) {
-    selectedMatchId = null;
-    showEmptyDetail();
+    closeDetail();
     return;
   }
   const favoriteButton = event.target.closest('[data-action="detail-favorite"]');
@@ -703,6 +727,8 @@ detailElement.addEventListener("click", (event) => {
   }
 });
 
+detailBackdrop.addEventListener("click", closeDetail);
+
 searchInput.addEventListener("input", () => {
   searchTerm = searchInput.value.trim();
   renderMatches();
@@ -710,7 +736,16 @@ searchInput.addEventListener("input", () => {
 
 document.querySelector("#refresh-button").addEventListener("click", () => loadMatches({ force: true }));
 document.querySelector("#retry-button").addEventListener("click", () => loadMatches({ force: true }));
-document.querySelector(".theme-button").addEventListener("click", () => document.body.classList.toggle("light-theme"));
+let initialTheme = "dark";
+try {
+  initialTheme = localStorage.getItem("touchline-theme") === "light" ? "light" : "dark";
+} catch (error) {
+  console.error("Browser storage is unavailable; using the default color theme.", error);
+}
+setTheme(initialTheme);
+themeButton.addEventListener("click", () => {
+  setTheme(document.body.classList.contains("light-theme") ? "dark" : "light", true);
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
@@ -723,9 +758,7 @@ document.addEventListener("keydown", (event) => {
     searchTerm = "";
     renderMatches();
   } else if (event.key === "Escape" && selectedMatchId) {
-    selectedMatchId = null;
-    showEmptyDetail();
-    renderMatches();
+    closeDetail();
   }
 });
 
