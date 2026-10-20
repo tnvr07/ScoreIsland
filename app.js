@@ -253,7 +253,7 @@ function renderCompetitionFilters() {
     if (match.state === "in") existing.live += 1;
     groups.set(match.league, existing);
   }
-  const options = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const options = [...groups.entries()].sort((a, b) => compareCompetitionPriority(a[0], b[0]) || a[0].localeCompare(b[0]));
   competitionListElement.innerHTML = options.map(([name, info]) => `
     <button class="competition-option${activeCompetition === name ? " selected" : ""}" type="button" data-competition="${escapeHTML(name)}" aria-pressed="${activeCompetition === name}">
       <span class="competition-icon" aria-hidden="true">${escapeHTML(name.slice(0, 1))}</span>
@@ -320,6 +320,15 @@ function visibleMatches() {
   });
 }
 
+function isChampionsLeague(matchOrCompetition) {
+  return matchOrCompetition.leagueId === "775"
+    || /^(?:uefa )?champions league$/i.test(matchOrCompetition.league || matchOrCompetition);
+}
+
+function compareCompetitionPriority(first, second) {
+  return Number(isChampionsLeague(second)) - Number(isChampionsLeague(first));
+}
+
 function renderMatch(match) {
   const selected = match.id === selectedMatchId;
   return `<article class="match-row${selected ? " selected" : ""}" data-match="${escapeHTML(match.id)}">
@@ -335,7 +344,8 @@ function renderMatch(match) {
 }
 
 function renderLiveBoard() {
-  const liveMatches = matches.filter(({ state }) => state === "in");
+  const liveMatches = matches.filter(({ state }) => state === "in")
+    .sort((a, b) => compareCompetitionPriority(a, b) || new Date(a.date) - new Date(b.date));
   const grid = document.querySelector("#live-board-grid");
   const empty = document.querySelector("#live-board-empty");
   const board = document.querySelector("#live-board");
@@ -379,7 +389,9 @@ function renderMatches() {
     if (!groups.has(match.league)) groups.set(match.league, []);
     groups.get(match.league).push(match);
   }
-  listElement.innerHTML = [...groups.entries()].map(([league, leagueMatches]) => `
+  listElement.innerHTML = [...groups.entries()]
+    .sort((a, b) => compareCompetitionPriority(a[0], b[0]) || a[0].localeCompare(b[0]))
+    .map(([league, leagueMatches]) => `
     <section class="league-group">
       <button class="league-heading" type="button" data-league="${escapeHTML(league)}" aria-label="Filter by ${escapeHTML(league)}">
         <span class="league-mark">${escapeHTML(league.slice(0, 1))}</span>
