@@ -477,10 +477,6 @@ async function loadMatches({ force = false } = {}) {
       selectedMatchId = null;
       showEmptyDetail();
     }
-    if (!selectedMatchId) {
-      const preferredMatch = matches.find(({ state }) => state === "in") ?? matches[0];
-      if (preferredMatch) selectedMatchId = preferredMatch.id;
-    }
     setFeedStatus("connected", "SCORES CONNECTED");
     document.querySelector("#error-banner").hidden = true;
     renderMatches();
@@ -515,8 +511,21 @@ function showEmptyDetail() {
   detailEmptyElement.hidden = false;
   detailElement.hidden = true;
   detailElement.innerHTML = "";
-  document.querySelector("#match-panel").classList.remove("mobile-open");
+  const panel = document.querySelector("#match-panel");
+  panel.removeAttribute("role");
+  panel.removeAttribute("aria-modal");
   document.body.classList.remove("detail-open");
+}
+
+function closeMatchDetail() {
+  const closedMatchId = selectedMatchId;
+  selectedMatchId = null;
+  showEmptyDetail();
+  renderMatches();
+  const trigger = [...document.querySelectorAll(".match-select, [data-live-match]")]
+    .find((element) => element.closest("[data-match]")?.dataset.match === closedMatchId
+      || element.dataset.liveMatch === closedMatchId);
+  trigger?.focus();
 }
 
 function detailTeamMarkup(team) {
@@ -532,6 +541,32 @@ function detailOverview(match, detail) {
   const competition = detail?.header?.competitions?.[0] ?? {};
   const events = detail?.keyEvents ?? [];
   const recentGames = detail?.lastFiveGames ?? [];
+  const timedEvents = events.filter((item) => item.clock?.value != null && Number.isFinite(Number(item.clock.value)));
+  const momentumMarkers = timedEvents.map((item) => {
+    const eventTeamId = String(item.team?.id ?? "");
+    const eventTeamName = item.team?.displayName ?? "";
+    const side = eventTeamId === String(match.home.id) || eventTeamName === match.home.name
+      ? "home"
+      : eventTeamId === String(match.away.id) || eventTeamName === match.away.name
+        ? "away"
+        : "neutral";
+    const position = Math.min(99, Math.max(1, (Number(item.clock.value) / 5400) * 100));
+    const eventLabel = item.text || item.shortText || item.type?.text || "Match event";
+    return `<span class="momentum-marker ${side}" style="--event-position:${position}%" title="${escapeHTML(eventLabel)}" aria-label="${escapeHTML(eventLabel)}">${escapeHTML(eventIcon(item.type?.text))}</span>`;
+  }).join("");
+  const momentum = `<section class="momentum-card" aria-labelledby="momentum-title">
+      <div class="momentum-heading"><div><span class="momentum-kicker">MATCH FLOW</span><h3 id="momentum-title">Match momentum</h3></div><span class="momentum-unavailable">Pressure data unavailable</span></div>
+      <p class="momentum-note">ESPN does not provide attack-pressure data for this fixture. This clock shows reported key events only; no momentum curve is inferred.</p>
+      <div class="momentum-chart" role="img" aria-label="Reported match events on the match clock. Attack-pressure data is not available.">
+        <div class="momentum-plot">
+          <div class="momentum-lane home"><span>${escapeHTML(match.home.shortName)}</span></div>
+          <div class="momentum-lane away"><span>${escapeHTML(match.away.shortName)}</span></div>
+          ${momentumMarkers || '<span class="momentum-empty">No timed key events have been reported.</span>'}
+          <div class="momentum-axis" aria-hidden="true"><span>0′</span><span>15′</span><span>30′</span><span>45′</span><span>60′</span><span>75′</span><span>90′</span></div>
+        </div>
+      </div>
+      <div class="momentum-legend"><span class="home"><i></i>${escapeHTML(match.home.name)}</span><span class="away"><i></i>${escapeHTML(match.away.name)}</span></div>
+    </section>`;
   const timeline = events.length
     ? events.map((item) => `<div class="timeline-item"><span class="timeline-minute">${escapeHTML(item.clock?.displayValue || item.period?.number || "")}</span><span class="timeline-icon">${escapeHTML(eventIcon(item.type?.text))}</span><span class="timeline-text">${escapeHTML(item.text || item.shortText || item.type?.text || "Match event")}</span></div>`).join("")
     : '<div class="detail-placeholder">No match events have been reported yet.</div>';
@@ -556,8 +591,10 @@ function detailOverview(match, detail) {
       return `<a class="news-item" href="${escapeHTML(href || "#")}"${href ? ' target="_blank" rel="noopener noreferrer"' : ""}><strong>${escapeHTML(article.headline)}</strong><span>${escapeHTML(article.description || "Read more")}</span></a>`;
     }).join("")}</div></div>`
     : "";
-  return `<div class="detail-section"><h3>Match timeline</h3><div class="timeline">${timeline}</div></div>
-    <div class="detail-section"><h3>Match information</h3><div class="info-list">${info}</div></div>${form ? `<div class="detail-section"><h3>Recent form</h3>${form}</div>` : ""}${news}`;
+  return `${momentum}<div class="detail-overview-grid">
+    <div class="detail-section"><h3>Match timeline</h3><div class="timeline">${timeline}</div></div>
+    <div><div class="detail-section"><h3>Match information</h3><div class="info-list">${info}</div></div>${form ? `<div class="detail-section"><h3>Recent form</h3>${form}</div>` : ""}${news}</div>
+  </div>`;
 }
 
 function eventIcon(type) {
@@ -580,23 +617,123 @@ function detailStatistics(detail) {
   return `<div class="stats-teams"><span>${escapeHTML(home.team?.displayName || "Home")}</span><span>${escapeHTML(away.team?.displayName || "Away")}</span></div><div class="stats-list">${rows.join("") || '<div class="detail-placeholder">No statistics have been reported.</div>'}</div>`;
 }
 
-function lineupTeamMarkup(roster) {
-  const rosteredPlayers = roster.roster ?? [];
-  const starters = rosteredPlayers.filter((entry) => entry.starter);
-  const players = starters.length ? starters : rosteredPlayers.filter((entry) => entry.active);
-  const substitutes = rosteredPlayers.filter((entry) => !entry.starter && (entry.active || entry.subbedIn));
-  const playerRows = (entries) => entries.map((entry) => `<div class="player-row"><span class="player-number">${escapeHTML(entry.jersey?.displayValue || entry.jersey || "—")}</span><span class="player-name">${escapeHTML(entry.athlete?.displayName || entry.athlete?.shortName || "Player")}</span><span class="player-position">${escapeHTML(entry.position?.abbreviation || "")}</span></div>`).join("");
-  const playersMarkup = players.length
-    ? `<div class="lineup-label">Starting line-up</div>${playerRows(players)}${substitutes.length ? `<div class="lineup-label substitutes-label">Substitutes</div>${playerRows(substitutes)}` : ""}`
-    : '<div class="detail-placeholder">Starting line-up has not been published.</div>';
-  return `<section class="lineup-team"><h4>${escapeHTML(roster.team?.displayName || "Team")}<span>${escapeHTML(roster.formation || "")}</span></h4>${playersMarkup}</section>`;
+function lineupPositionGroup(player) {
+  const position = `${player.position?.abbreviation || ""} ${player.position?.displayName || ""}`.toUpperCase();
+  if (/^(G|GK)\b|GOALKEEPER/.test(position)) return "goalkeeper";
+  if (/\b(CB|CD|RB|LB|WB|DEF)\b|CENTRE.?BACK|CENTER.?BACK|FULL.?BACK|DEFENDER/.test(position)) return "defender";
+  if (/\b(F|CF|ST|FW)\b|FORWARD|STRIKER/.test(position)) return "forward";
+  return "midfielder";
+}
+
+function lineupPlayerOrder(first, second) {
+  const firstPlace = Number(first.formationPlace);
+  const secondPlace = Number(second.formationPlace);
+  if (Number.isFinite(firstPlace) && Number.isFinite(secondPlace)) return firstPlace - secondPlace;
+  return String(first.athlete?.displayName || "").localeCompare(String(second.athlete?.displayName || ""));
+}
+
+function lineupFormationRows(roster) {
+  const starters = (roster.roster ?? []).filter((player) => player.starter).sort(lineupPlayerOrder);
+  const goalkeeper = starters.find((player) => lineupPositionGroup(player) === "goalkeeper");
+  const outfield = starters.filter((player) => player !== goalkeeper);
+  const formation = String(roster.formation || "").split("-").map(Number);
+  const validFormation = formation.length >= 3
+    && formation.every((count) => Number.isInteger(count) && count > 0)
+    && formation.reduce((total, count) => total + count, 0) === outfield.length;
+
+  if (!goalkeeper || outfield.length === 0) return null;
+  const defenders = outfield.filter((player) => lineupPositionGroup(player) === "defender");
+  const forwards = outfield.filter((player) => lineupPositionGroup(player) === "forward");
+  const midfielders = outfield.filter((player) => lineupPositionGroup(player) === "midfielder");
+  const defenderCount = validFormation ? formation[0] : defenders.length;
+  const forwardCount = validFormation ? formation.at(-1) : forwards.length;
+  const midfieldCounts = validFormation ? formation.slice(1, -1) : [midfielders.length];
+  const defensiveLine = defenders.splice(0, defenderCount);
+  const attackingLine = forwards.splice(0, forwardCount);
+  let centralPlayers = [...midfielders, ...defenders, ...forwards].sort(lineupPlayerOrder);
+  const rows = midfieldCounts.map((count) => {
+    const row = centralPlayers.splice(0, count);
+    return row;
+  });
+
+  if (centralPlayers.length || defensiveLine.length !== defenderCount || attackingLine.length !== forwardCount) {
+    const orderedOutfield = [...outfield].sort(lineupPlayerOrder);
+    const rowSize = validFormation ? formation : [Math.max(1, Math.floor(outfield.length / 3)), Math.max(1, Math.floor(outfield.length / 3))];
+    const sizes = rowSize.length > 2 ? rowSize : [...rowSize, Math.max(1, outfield.length - rowSize.reduce((sum, count) => sum + count, 0))];
+    let offset = 0;
+    return {
+      goalkeeper,
+      rows: sizes.map((count) => {
+        const row = orderedOutfield.slice(offset, offset + count);
+        offset += count;
+        return row;
+      }).filter((row) => row.length),
+    };
+  }
+
+  return { goalkeeper, rows: [defensiveLine, ...rows, attackingLine].filter((row) => row.length) };
+}
+
+function lineupPlayerMarkup(player, color) {
+  const name = player.athlete?.displayName || player.athlete?.shortName || "Player";
+  const number = player.jersey?.displayValue || player.jersey || "—";
+  const position = player.position?.abbreviation || "";
+  return `<div class="pitch-player" title="${escapeHTML(`${number} ${name}${position ? ` · ${position}` : ""}`)}">
+    <span class="pitch-shirt" style="--shirt-color:${color}" aria-hidden="true"><span>${escapeHTML(number)}</span></span>
+    <span class="pitch-player-name">${escapeHTML(name)}</span>
+    ${position ? `<span class="pitch-player-position">${escapeHTML(position)}</span>` : ""}
+  </div>`;
+}
+
+function lineupTeamPitch(roster, side) {
+  const formation = lineupFormationRows(roster);
+  if (!formation) return "";
+  const homeColor = "#63d6b3";
+  const awayColor = "#ff9a76";
+  const color = side === "home" ? homeColor : awayColor;
+  const rows = side === "home" ? [...formation.rows].reverse() : formation.rows;
+  const lines = rows.map((row) => `<div class="pitch-line" style="--players-in-line:${row.length}">${row.map((player) => lineupPlayerMarkup(player, color)).join("")}</div>`);
+  const keeper = `<div class="pitch-line pitch-goalkeeper">${lineupPlayerMarkup(formation.goalkeeper, color)}</div>`;
+  const teamLines = side === "home" ? [...lines, keeper] : [keeper, ...lines];
+  return `<div class="pitch-team pitch-team-${side}" aria-label="${escapeHTML(roster.team?.displayName || side)} line-up">
+    <div class="pitch-team-heading"><strong>${escapeHTML(roster.team?.displayName || (side === "home" ? "Home" : "Away"))}</strong><span>${escapeHTML(roster.formation || "Formation unavailable")}</span></div>
+    <div class="pitch-players">${teamLines.join("")}</div>
+  </div>`;
+}
+
+function lineupBench(roster, side) {
+  const substitutes = (roster.roster ?? []).filter((player) => !player.starter);
+  if (!substitutes.length) return "";
+  const color = side === "home" ? "#63d6b3" : "#ff9a76";
+  return `<section class="lineup-bench-team">
+    <h4><span class="bench-indicator" style="--shirt-color:${color}"></span>${escapeHTML(roster.team?.displayName || "Team")}</h4>
+    <div class="lineup-bench-list">${substitutes.map((player) => `<div class="bench-player">
+      <span class="bench-number">${escapeHTML(player.jersey?.displayValue || player.jersey || "—")}</span>
+      <span class="bench-player-name">${escapeHTML(player.athlete?.displayName || player.athlete?.shortName || "Player")}</span>
+      ${player.subbedIn ? '<span class="bench-status">ON</span>' : ""}
+    </div>`).join("")}</div>
+  </section>`;
 }
 
 function detailLineups(detail) {
   const rosters = detail?.rosters ?? [];
-  return rosters.length
-    ? `<div class="lineups-list">${rosters.map(lineupTeamMarkup).join("")}</div>`
-    : '<div class="detail-placeholder">Line-ups are not available for this match.</div>';
+  if (rosters.length < 2) return '<div class="detail-placeholder">Line-ups are not available for this match yet.</div>';
+  const home = rosters.find((roster) => roster.homeAway === "home") || rosters[0];
+  const away = rosters.find((roster) => roster.homeAway === "away") || rosters[1];
+  const homePitch = lineupTeamPitch(home, "home");
+  const awayPitch = lineupTeamPitch(away, "away");
+  if (!homePitch || !awayPitch) {
+    return '<div class="detail-placeholder">Confirmed starting line-ups are not available for this match yet.</div>';
+  }
+  return `<div class="lineup-view">
+    <div class="lineup-legend"><span><i class="home-legend"></i>${escapeHTML(home.team?.displayName || "Home")}</span><span><i class="away-legend"></i>${escapeHTML(away.team?.displayName || "Away")}</span></div>
+    <div class="lineup-pitch" role="group" aria-label="Starting line-ups on a football pitch">
+      <div class="pitch-markings" aria-hidden="true"></div>
+      ${awayPitch}${homePitch}
+    </div>
+    <div class="bench-heading"><span>SUBSTITUTES</span><span>Players not in the starting line-up</span></div>
+    <div class="lineup-benches">${lineupBench(home, "home")}${lineupBench(away, "away")}</div>
+  </div>`;
 }
 
 function flattenStandings(data) {
@@ -643,15 +780,20 @@ function detailTabMarkup(match, detail) {
   return detailOverview(match, detail);
 }
 
-function renderDetail({ openMobile = false } = {}) {
+function renderDetail() {
   const match = matchCache.get(selectedMatchId);
   if (!match) return showEmptyDetail();
+  const panel = document.querySelector("#match-panel");
+  const wasOpen = document.body.classList.contains("detail-open");
   const detail = detailCache.get(match.id);
   detailEmptyElement.hidden = true;
   detailElement.hidden = false;
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  document.body.classList.add("detail-open");
   detailElement.innerHTML = `
     <div class="detail-header">
-      <button class="detail-close" type="button" data-action="close-detail" aria-label="Close match details">×</button>
+      <button class="detail-close" type="button" data-action="close-detail" aria-label="Back to matches">← <span>Back to matches</span></button>
       <span class="detail-competition">${escapeHTML(match.league)}${match.stage ? ` · ${escapeHTML(match.stage)}` : ""}</span>
       <span class="detail-match-date">${escapeHTML(new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(match.date)))}</span>
     </div>
@@ -668,10 +810,7 @@ function renderDetail({ openMobile = false } = {}) {
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91L12 3Z"></path></svg>
       ${favorites.has(match.id) ? "Following match" : "Follow match"}
     </button>`;
-  if (openMobile && window.matchMedia("(max-width: 720px)").matches) {
-    document.querySelector("#match-panel").classList.add("mobile-open");
-    document.body.classList.add("detail-open");
-  }
+  if (!wasOpen) panel.querySelector(".detail-close").focus();
 }
 
 async function loadMatchDetails(match) {
@@ -692,11 +831,11 @@ async function loadMatchDetails(match) {
   }
 }
 
-function selectMatch(matchId, { openMobile = true } = {}) {
+function selectMatch(matchId) {
   selectedMatchId = matchId;
   selectedDetailTab = "overview";
   renderMatches();
-  renderDetail({ openMobile });
+  renderDetail();
   const match = matchCache.get(matchId);
   if (match) loadMatchDetails(match);
 }
@@ -805,8 +944,7 @@ document.querySelector("#live-board").addEventListener("click", (event) => {
 detailElement.addEventListener("click", (event) => {
   const closeButton = event.target.closest('[data-action="close-detail"]');
   if (closeButton) {
-    selectedMatchId = null;
-    showEmptyDetail();
+    closeMatchDetail();
     return;
   }
   const favoriteButton = event.target.closest('[data-action="detail-favorite"]');
@@ -857,6 +995,23 @@ document.addEventListener("keydown", (event) => {
       themeOptions[nextIndex].focus();
     }
   }
+  if (document.body.classList.contains("detail-open") && event.key === "Tab") {
+    const panel = document.querySelector("#match-panel");
+    const focusable = [...panel.querySelectorAll('button:not([disabled]), a[href], input:not([disabled])')];
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const currentIndex = focusable.indexOf(document.activeElement);
+    if (currentIndex === -1 && first) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.shiftKey && currentIndex === 0) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && currentIndex === focusable.length - 1) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
   if (event.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
     event.preventDefault();
     searchInput.focus();
@@ -867,9 +1022,7 @@ document.addEventListener("keydown", (event) => {
     searchTerm = "";
     renderMatches();
   } else if (event.key === "Escape" && selectedMatchId) {
-    selectedMatchId = null;
-    showEmptyDetail();
-    renderMatches();
+    closeMatchDetail();
   }
 });
 
