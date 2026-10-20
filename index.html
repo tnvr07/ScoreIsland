@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101110">
+    <meta name="description" content="A live football scoreboard with instant match updates, scores, and goal timelines.">
+    <title>Touchline — Live Football Scores</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Touchline home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>touchline<span class="brand-period">.</span></span>
+        </a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a class="nav-link active" href="#scores">Scores</a>
+          <a class="nav-link" href="#leagues">Leagues</a>
+          <a class="nav-link" href="#about">About</a>
+        </nav>
+        <div class="topbar-right">
+          <span class="demo-tag"><span class="demo-dot"></span> DEMO MODE</span>
+          <button class="icon-button theme-button" type="button" aria-label="Toggle color theme" title="Toggle color theme">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>
+          </button>
+        </div>
+      </header>
+
+      <main id="scores">
+        <section class="intro">
+          <div class="intro-copy">
+            <p class="eyebrow"><span class="eyebrow-line"></span> THE BEAUTIFUL GAME, IN REAL TIME</p>
+            <h1>Every moment.<br><span>Every score.</span></h1>
+            <p class="intro-description">The matches you care about, as they happen. No refresh needed.</p>
+          </div>
+          <div class="today-card">
+            <span class="today-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M7.5 3v4M16.5 3v4M4 9.5h16"></path></svg>
+            </span>
+            <div><span class="today-label">MATCHDAY</span><strong id="today-date"></strong></div>
+            <span class="today-divider"></span>
+            <div class="local-time"><span class="today-label">YOUR TIME</span><strong id="local-time"></strong></div>
+          </div>
+        </section>
+
+        <section class="scoreboard" aria-label="Football match scores">
+          <div class="scoreboard-heading">
+            <div class="scoreboard-title">
+              <span class="heading-ball" aria-hidden="true">✳</span>
+              <div><h2>Match center</h2><p id="match-summary">The latest from the pitch</p></div>
+            </div>
+            <div class="connection-status"><span class="connection-dot"></span> UPDATING LIVE</div>
+          </div>
+
+          <div class="score-controls">
+            <div class="match-tabs" role="tablist" aria-label="Filter matches">
+              <button class="tab active" type="button" role="tab" aria-selected="true" data-filter="all">All matches <span id="all-count">6</span></button>
+              <button class="tab" type="button" role="tab" aria-selected="false" data-filter="live"><span class="tab-live-dot"></span> Live now <span id="live-count">3</span></button>
+              <button class="tab" type="button" role="tab" aria-selected="false" data-filter="favorites">Following <span id="favorites-count">2</span></button>
+              <button class="tab" type="button" role="tab" aria-selected="false" data-filter="upcoming">Upcoming <span id="upcoming-count">2</span></button>
+              <button class="tab" type="button" role="tab" aria-selected="false" data-filter="finished">Results <span id="finished-count">1</span></button>
+            </div>
+            <label class="search-box">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"></circle><path d="m15.5 15.5 4 4"></path></svg>
+              <input id="match-search" type="search" placeholder="Find a team..." autocomplete="off" aria-label="Find a team">
+              <kbd>/</kbd>
+            </label>
+          </div>
+
+          <div class="matchday-bar" id="leagues">
+            <div class="date-navigation" aria-label="Choose match day">
+              <button class="date-arrow" type="button" data-day-offset="-1" aria-label="Previous day">‹</button>
+              <button class="date-current" type="button" data-day-offset="0"><span class="date-calendar-icon" aria-hidden="true">▦</span><span id="selected-date-label">Today</span><span id="selected-date-detail"></span></button>
+              <button class="date-arrow" type="button" data-day-offset="1" aria-label="Next day">›</button>
+              <button class="today-button" type="button" data-day-offset="today">Today</button>
+              <label class="date-picker-label" title="Choose a date"><input id="match-date" type="date" aria-label="Choose match date"></label>
+            </div>
+            <div class="competition-filters" id="competition-filters" aria-label="Filter by competition"></div>
+          </div>
+
+          <div class="league-list" id="league-list" aria-live="polite"></div>
+          <div class="empty-state" id="empty-state" hidden>
+            <span aria-hidden="true">⌕</span>
+            <strong id="empty-title">No matches found</strong>
+            <p id="empty-description">Try another team name or switch match filters.</p>
+          </div>
+          <p class="feed-note"><span class="feed-note-icon">i</span> Demo scores update automatically. Connect a live sports data provider for real fixtures and results.</p>
+        </section>
+
+        <footer id="about">
+          <a class="brand footer-brand" href="#"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span>touchline<span class="brand-period">.</span></span></a>
+          <span>Made for the love of the game.</span>
+          <span class="footer-status"><span class="connection-dot"></span> ALL SYSTEMS PLAYING</span>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>
