@@ -14,13 +14,17 @@ Then open `http://localhost:8000`.
 
 ## Match data
 
-The page reads football fixtures from ESPN's public scoreboard endpoint and requests ESPN match summaries when a fixture is selected. Daily score requests load the neighboring UTC dates with an expanded event limit, then group events by the browser's local date. This keeps late-night matches on the correct selected day and avoids the endpoint's default 100-event cutoff. Scores refresh once per minute. There are no simulated score changes or API keys in the project.
+The page reads football fixtures from ESPN's public scoreboard endpoint and requests ESPN match summaries when a fixture is selected. Daily score requests load the neighboring UTC dates with an expanded event limit, then group events by the browser's local date. This keeps late-night matches on the correct selected day and avoids the endpoint's default 100-event cutoff. Scores refresh every 15 seconds while matches are live and once per minute otherwise; polling pauses while the browser tab is hidden. There are no simulated score changes or API keys in the project.
 
 The feed covers many competitions around the world, but it does not guarantee every match or every competition. Match events, statistics, line-ups, standings, venue and broadcast information are shown when ESPN supplies them. An internet connection is required.
 
 ## Features
 
 - Browse dates, search fixtures, and filter by match status or competition.
+- Share dates, status and competition filters, and the selected match through the URL; browser back/forward restores the previous view.
+- Quickly find competitions, follow matches, and see followed fixtures pinned above the main list.
+- Automatically opens a relevant match on larger screens; the detail panel remains sticky beside the fixture list. On phones, match details open as a full-screen view.
+- Score changes are announced accessibly and briefly highlighted. Failed refreshes keep the last available scores visible with a stale-data notice.
 - Follow every live match in the horizontally scrollable header score strip; it stays current when browsing another date and opens each match centre.
 - Choose between Aurora, Neon, and Daylight color themes; your selection is saved in the browser.
 - Browse a refreshed, responsive match-day interface with clearer score hierarchy, competition filters, live highlights, and match-centre layouts.

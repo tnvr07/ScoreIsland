@@ -1,5 +1,7 @@
 const API_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/all";
 const REFRESH_INTERVAL = 60_000;
+const LIVE_REFRESH_INTERVAL = 15_000;
+const SEARCH_DEBOUNCE = 180;
 const ESPN_LEAGUES = {
   "650": "Colombian Primera A",
   "700": "Premier League",
@@ -38,18 +40,26 @@ const detailEmptyElement = document.querySelector("#detail-empty");
 const matchCache = new Map();
 const detailCache = new Map();
 const currentDate = new Date();
-let selectedDate = toDateKey(currentDate);
+const competitionSearchInput = document.querySelector("#competition-search");
+let selectedDate;
 let matches = [];
 let liveScoreMatches = [];
-let selectedMatchId = null;
-let activeStatus = "all";
-let activeCompetition = "all";
+let selectedMatchId;
+let activeStatus;
+let activeCompetition;
 let searchTerm = "";
+let competitionSearchTerm = "";
 let requestInProgress = false;
 let scoreRequestController = null;
 let selectedDetailTab = "overview";
 let selectedEventFilter = "all";
 let toastTimeout = 0;
+let searchTimeout = 0;
+let refreshTimeout = 0;
+let hasAutoSelectedMatch = false;
+let lastSuccessfulFetchAt = null;
+let lastScoreSnapshot = new Map();
+const flashedMatchIds = new Set();
 
 function toDateKey(date) {
   const year = date.getFullYear();
@@ -66,6 +76,28 @@ function fromDateKey(value) {
 function toApiDate(value) {
   return value.replaceAll("-", "");
 }
+
+function readRouteState() {
+  const params = new URLSearchParams(window.location.search);
+  const date = params.get("date");
+  const status = params.get("status");
+  const parsedDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? fromDateKey(date) : null;
+  const validDate = parsedDate && toDateKey(parsedDate) === date;
+  return {
+    date: validDate
+      ? date
+      : toDateKey(new Date()),
+    status: ["all", "live", "pre", "post", "favorites", "broadcast"].includes(status) ? status : "all",
+    competition: params.get("comp") || "all",
+    match: params.get("match") || "",
+  };
+}
+
+const initialRouteState = readRouteState();
+selectedDate = initialRouteState.date;
+selectedMatchId = initialRouteState.match || null;
+activeStatus = initialRouteState.status;
+activeCompetition = initialRouteState.competition;
 
 function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -144,12 +176,66 @@ function setFeedStatus(state, text) {
   const element = document.querySelector("#feed-status");
   element.className = `feed-status ${state}`;
   document.querySelector("#feed-status-text").textContent = text;
+  element.title = state === "connected"
+    ? "Score feed connected"
+    : state === "loading"
+      ? "Updating match scores"
+      : text;
+}
+
+function localTimeZoneLabel() {
+  return new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+    .formatToParts(new Date())
+    .find((part) => part.type === "timeZoneName")?.value || "local";
 }
 
 function timeLabel(isoDate) {
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return "Time TBC";
   return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function syncUrlState({ push = false } = {}) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("date", selectedDate);
+  if (activeStatus === "all") url.searchParams.delete("status");
+  else url.searchParams.set("status", activeStatus);
+  if (activeCompetition === "all") url.searchParams.delete("comp");
+  else url.searchParams.set("comp", activeCompetition);
+  if (selectedMatchId) url.searchParams.set("match", selectedMatchId);
+  else url.searchParams.delete("match");
+  const method = push ? "pushState" : "replaceState";
+  window.history[method]({ touchline: true, touchlineMatch: push && Boolean(selectedMatchId) }, "", url);
+}
+
+function scoreSnapshot(match) {
+  return `${match.home.score ?? "—"}:${match.away.score ?? "—"}`;
+}
+
+function flashScoreUpdate(match) {
+  flashedMatchIds.add(match.id);
+  window.setTimeout(() => {
+    flashedMatchIds.delete(match.id);
+    document.querySelectorAll(`[data-score-match="${CSS.escape(match.id)}"]`).forEach((element) => {
+      element.classList.remove("score-updated");
+    });
+  }, 1400);
+}
+
+function announceScoreChanges(nextMatches) {
+  const announcements = [];
+  for (const match of nextMatches) {
+    const nextScore = scoreSnapshot(match);
+    const previousScore = lastScoreSnapshot.get(match.id);
+    if (previousScore && previousScore !== nextScore && match.state === "in") {
+      flashScoreUpdate(match);
+      announcements.push(`${match.home.name} ${match.home.score}, ${match.away.name} ${match.away.score}`);
+    }
+    lastScoreSnapshot.set(match.id, nextScore);
+  }
+  if (announcements.length) {
+    document.querySelector("#score-announcer").textContent = `Score update: ${announcements.join("; ")}`;
+  }
 }
 
 function getCompetitionInfo(event) {
@@ -177,6 +263,7 @@ function normalizeTeam(competitor, side) {
     abbreviation: team.abbreviation || initials.slice(0, 3).toUpperCase(),
     score: competitor.score ?? null,
     winner: Boolean(competitor.winner),
+    loser: false,
     logo: team.logo || team.logos?.[0]?.href || "",
     color: teamColor,
     record: competitor.records?.find((record) => record.type === "total")?.summary || "",
@@ -190,6 +277,10 @@ function normalizeMatch(event) {
   const away = competitors.find((competitor) => competitor.homeAway === "away") ?? competitors[1] ?? {};
   const { id: competitionId, name: competitionName, stage } = getCompetitionInfo(event);
   const state = competition.status?.type?.state || event.status?.type?.state || "pre";
+  const homeTeam = normalizeTeam(home, 0);
+  const awayTeam = normalizeTeam(away, 1);
+  if (homeTeam.winner) awayTeam.loser = true;
+  if (awayTeam.winner) homeTeam.loser = true;
   return {
     id: String(event.id),
     uid: event.uid ?? "",
@@ -205,8 +296,8 @@ function normalizeMatch(event) {
     leagueId: competitionId,
     league: competitionName,
     stage,
-    home: normalizeTeam(home, 0),
-    away: normalizeTeam(away, 1),
+    home: homeTeam,
+    away: awayTeam,
     venue: competition.venue?.fullName || event.venue?.fullName || "",
     city: competition.venue?.address?.city || "",
     country: competition.venue?.address?.country || "",
@@ -256,18 +347,71 @@ function renderCompetitionFilters() {
     if (match.state === "in") existing.live += 1;
     groups.set(match.league, existing);
   }
-  const options = [...groups.entries()].sort((a, b) => compareCompetitionPriority(a[0], b[0]) || a[0].localeCompare(b[0]));
-  competitionListElement.innerHTML = options.map(([name, info]) => `
+  const options = [...groups.entries()]
+    .filter(([name]) => !competitionSearchTerm || name.toLocaleLowerCase().includes(competitionSearchTerm))
+    .sort((a, b) => compareCompetitionPriority(a[0], b[0]) || a[0].localeCompare(b[0]));
+  const renderOption = ([name, info]) => `
     <button class="competition-option${activeCompetition === name ? " selected" : ""}" type="button" data-competition="${escapeHTML(name)}" aria-pressed="${activeCompetition === name}">
-      <span class="competition-icon" aria-hidden="true">${escapeHTML(name.slice(0, 1))}</span>
+      <span class="competition-icon" aria-hidden="true">${competitionIcon(name)}</span>
       <span class="competition-option-label">${escapeHTML(name)}${info.live ? '<span class="competition-live-dot"></span>' : ""}</span>
       <span class="competition-count">${info.count}</span>
-    </button>
-  `).join("");
+    </button>`;
+  const topLeagues = options.filter(([name]) => TOP_COMPETITIONS.includes(name));
+  const otherLeagues = options.filter(([name]) => !TOP_COMPETITIONS.includes(name));
+  competitionListElement.innerHTML = `${topLeagues.length ? `<div class="competition-group-label">TOP LEAGUES</div>${topLeagues.map(renderOption).join("")}` : ""}
+    ${otherLeagues.length ? `<div class="competition-group-label">MORE COMPETITIONS</div>${otherLeagues.map(renderOption).join("")}` : ""}
+    ${options.length ? "" : '<p class="competition-search-empty">No competitions found.</p>'}`;
   const allOption = document.querySelector('[data-competition="all"]');
   allOption.classList.toggle("selected", activeCompetition === "all");
   allOption.setAttribute("aria-pressed", String(activeCompetition === "all"));
   document.querySelector("#all-count").textContent = matches.length;
+  const activeCount = Number(activeStatus !== "all") + Number(activeCompetition !== "all") + Number(Boolean(searchTerm));
+  document.querySelector("#active-filter-count").textContent = `${activeCount} ${activeCount === 1 ? "filter" : "filters"}`;
+  document.querySelector("#clear-filters").disabled = activeCount === 0;
+}
+
+const TOP_COMPETITIONS = [
+  "Premier League",
+  "UEFA Champions League",
+  "LaLiga",
+  "Serie A",
+  "Bundesliga",
+  "Ligue 1",
+  "UEFA Europa League",
+  "UEFA Conference League",
+];
+
+function competitionIcon(name) {
+  if (/^uefa (?:champions|europa|conference) league/i.test(name)) return "✦";
+  if (/caf/i.test(name)) return "🌍";
+  if (/premier league|english fa cup|efl|scottish|spfl/i.test(name)) return "🇬🇧";
+  if (/laliga/i.test(name)) return "🇪🇸";
+  if (/copa chile/i.test(name)) return "🇨🇱";
+  if (/serie a/i.test(name)) return "🇮🇹";
+  if (/bundesliga/i.test(name)) return "🇩🇪";
+  if (/ligue 1/i.test(name)) return "🇫🇷";
+  if (/liga mx/i.test(name)) return "🇲🇽";
+  if (/saudi/i.test(name)) return "🇸🇦";
+  if (/colombian/i.test(name)) return "🇨🇴";
+  if (/copa bolivia/i.test(name)) return "🇧🇴";
+  if (/brazilian/i.test(name)) return "🇧🇷";
+  if (/sudamericana|concacaf|guatemalan/i.test(name)) return "🌎";
+  if (/ncaa/i.test(name)) return "🇺🇸";
+  if (/j league|japanese/i.test(name)) return "🇯🇵";
+  if (/fifa/i.test(name)) return "🌐";
+  return "⚽";
+}
+
+function highlightedText(value) {
+  const text = String(value ?? "");
+  if (!searchTerm) return escapeHTML(text);
+  const escapedQuery = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(${escapedQuery})`, "ig");
+  return text.split(pattern).map((part) =>
+    part.toLocaleLowerCase() === searchTerm.toLocaleLowerCase()
+      ? `<mark>${escapeHTML(part)}</mark>`
+      : escapeHTML(part)
+  ).join("");
 }
 
 function matchClock(match) {
@@ -278,14 +422,20 @@ function matchClock(match) {
   if (match.state === "post") {
     return `<span class="match-clock finished-clock">${escapeHTML(match.status || "FT")}</span>`;
   }
-  return `<span class="match-clock upcoming-clock">${escapeHTML(timeLabel(match.date))}</span>`;
+  return `<span class="match-clock upcoming-clock" title="Kickoff time in your local time zone">
+    <strong>${escapeHTML(timeLabel(match.date))}</strong><small>${escapeHTML(localTimeZoneLabel())}</small>
+  </span>`;
 }
 
 function scoreMarkup(match) {
   if (match.state === "pre") {
     return '<span class="score upcoming-score">VS</span>';
   }
-  return `<span class="score"><span class="${match.home.winner ? "winner" : ""}">${escapeHTML(match.home.score ?? "0")}</span><span class="score-separator">:</span><span class="${match.away.winner ? "winner" : ""}">${escapeHTML(match.away.score ?? "0")}</span></span>`;
+  return `<span class="score${flashedMatchIds.has(match.id) ? " score-updated" : ""}" data-score-match="${escapeHTML(match.id)}" aria-label="${escapeHTML(`${match.home.name} ${match.home.score ?? "0"}, ${match.away.name} ${match.away.score ?? "0"}`)}">
+    <span class="${match.home.winner ? "winner" : match.away.winner ? "loser" : ""}">${escapeHTML(match.home.score ?? "0")}</span>
+    <span class="score-separator">:</span>
+    <span class="${match.away.winner ? "winner" : match.home.winner ? "loser" : ""}">${escapeHTML(match.away.score ?? "0")}</span>
+  </span>`;
 }
 
 function detailGoalEvents(match, detail) {
@@ -327,9 +477,10 @@ function teamBadgeMarkup(team) {
 
 function teamMarkup(team, side) {
   const badge = teamBadgeMarkup(team);
-  return `<span class="team team-${side}${side === "away" ? " away-team" : ""}">
+  const recordTitle = team.record ? "Season record (wins-draws-losses)" : "";
+  return `<span class="team team-${side}${side === "away" ? " away-team" : ""}${team.winner ? " team-winner" : ""}${team.loser ? " team-loser" : ""}">
     ${side === "home" ? badge : ""}
-    <span class="team-label"><span class="team-name">${escapeHTML(team.shortName)}</span><span class="team-record">${escapeHTML(team.record)}</span></span>
+    <span class="team-label"><span class="team-name">${highlightedText(team.shortName)}</span>${team.record ? `<span class="team-record" title="${recordTitle}" aria-label="${escapeHTML(`${team.record}, season record wins-draws-losses`)}">${escapeHTML(team.record)}</span>` : ""}</span>
     ${side === "away" ? badge : ""}
   </span>`;
 }
@@ -351,18 +502,19 @@ function visibleMatches() {
   });
 }
 
-function isChampionsLeague(matchOrCompetition) {
-  return matchOrCompetition.leagueId === "775"
-    || /^(?:uefa )?champions league$/i.test(matchOrCompetition.league || matchOrCompetition);
-}
-
 function compareCompetitionPriority(first, second) {
-  return Number(isChampionsLeague(second)) - Number(isChampionsLeague(first));
+  const nameOf = (value) => typeof value === "string" ? value : value.league;
+  const priority = (value) => {
+    const name = nameOf(value);
+    const index = TOP_COMPETITIONS.findIndex((competition) => competition.toLocaleLowerCase() === name?.toLocaleLowerCase());
+    return index < 0 ? TOP_COMPETITIONS.length : index;
+  };
+  return priority(first) - priority(second);
 }
 
 function renderMatch(match) {
   const selected = match.id === selectedMatchId;
-  return `<article class="match-row${selected ? " selected" : ""}" data-match="${escapeHTML(match.id)}">
+  return `<article class="match-row${selected ? " selected" : ""}${match.state === "in" ? " live-match" : ""}" data-match="${escapeHTML(match.id)}">
     <button class="match-select" type="button" aria-label="${escapeHTML(`${match.home.name} ${match.home.score ?? ""} versus ${match.away.name} ${match.away.score ?? ""}, ${match.status}`)}" aria-pressed="${selected}">
       ${teamMarkup(match.home, "home")}
       <span class="score-block">${scoreMarkup(match)}${matchClock(match)}</span>
@@ -388,9 +540,37 @@ function renderLiveBoard() {
   empty.hidden = liveMatches.length > 0;
   grid.hidden = liveMatches.length === 0;
   if (!liveMatches.length) {
+    board.classList.add("is-quiet");
     grid.innerHTML = "";
+    const candidates = [...new Map([...matches, ...liveScoreMatches].map((match) => [match.id, match])).values()];
+    const nextMatch = candidates
+      .filter((match) => match.state === "pre" && new Date(match.date) > new Date())
+      .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+    const latestResult = candidates
+      .filter((match) => match.state === "post")
+      .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    if (nextMatch) {
+      const minutes = Math.max(1, Math.ceil((new Date(nextMatch.date) - Date.now()) / 60_000));
+      const countdown = minutes >= 60
+        ? `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`
+        : `${minutes}m`;
+      document.querySelector("#live-board-empty-copy").textContent =
+        `Quiet on the pitch · Next: ${nextMatch.home.shortName} vs ${nextMatch.away.shortName} in ${countdown}`;
+      document.querySelector("#live-board-empty button").textContent = "Browse fixtures →";
+      document.querySelector("#live-board-empty button").dataset.view = "upcoming";
+    } else if (latestResult) {
+      document.querySelector("#live-board-empty-copy").textContent =
+        `No matches live · Latest: ${latestResult.home.shortName} ${latestResult.home.score ?? "0"}–${latestResult.away.score ?? "0"} ${latestResult.away.shortName}`;
+      document.querySelector("#live-board-empty button").textContent = "View results →";
+      document.querySelector("#live-board-empty button").dataset.view = "finished";
+    } else {
+      document.querySelector("#live-board-empty-copy").textContent = "Quiet on the pitch right now.";
+      document.querySelector("#live-board-empty button").textContent = "Browse fixtures →";
+      document.querySelector("#live-board-empty button").dataset.view = "upcoming";
+    }
     return;
   }
+  board.classList.remove("is-quiet");
   grid.innerHTML = liveMatches.slice(0, 3).map((match) => {
     const detail = detailCache.get(match.id);
     const latestEvent = detail?.keyEvents?.length ? detail.keyEvents[detail.keyEvents.length - 1] : null;
@@ -416,6 +596,7 @@ function renderLiveScoreStrip() {
   const liveMatches = liveScoreMatches
     .filter(({ state }) => state === "in")
     .sort((a, b) => compareCompetitionPriority(a, b) || new Date(a.date) - new Date(b.date));
+  document.body.classList.toggle("has-live-scores", liveMatches.length > 0);
   strip.hidden = liveMatches.length === 0;
   count.textContent = liveMatches.length;
   track.innerHTML = liveMatches.map((match) => {
@@ -454,18 +635,28 @@ function renderMatches() {
     return (stateOrder[a.state] ?? 3) - (stateOrder[b.state] ?? 3)
       || new Date(a.date) - new Date(b.date);
   });
+  const following = activeStatus === "favorites" ? [] : filtered.filter((match) => favorites.has(match.id));
+  const pinnedIds = new Set(following.map((match) => match.id));
   const groups = new Map();
-  for (const match of filtered) {
+  for (const match of filtered.filter((item) => !pinnedIds.has(item.id))) {
     if (!groups.has(match.league)) groups.set(match.league, []);
     groups.get(match.league).push(match);
   }
-  listElement.innerHTML = [...groups.entries()]
+  const followingMarkup = following.length ? `<section class="league-group following-group">
+    <button class="league-heading following-heading" type="button" data-view="favorites" aria-label="Show followed matches">
+      <span class="league-mark" aria-hidden="true">★</span>
+      <span class="league-title">Following<small>Your followed matches</small></span>
+      <span class="league-count">${following.length}</span>
+    </button>
+    <div class="league-matches">${following.map(renderMatch).join("")}</div>
+  </section>` : "";
+  listElement.innerHTML = followingMarkup + [...groups.entries()]
     .sort((a, b) => compareCompetitionPriority(a[0], b[0]) || a[0].localeCompare(b[0]))
     .map(([league, leagueMatches]) => `
     <section class="league-group">
       <button class="league-heading" type="button" data-league="${escapeHTML(league)}" aria-label="Filter by ${escapeHTML(league)}">
-        <span class="league-mark">${escapeHTML(league.slice(0, 1))}</span>
-        <span class="league-title">${escapeHTML(league)}${leagueMatches[0].stage ? `<small>${escapeHTML(leagueMatches[0].stage)}</small>` : ""}</span>
+        <span class="league-mark">${competitionIcon(league)}</span>
+        <span class="league-title">${highlightedText(league)}${leagueMatches[0].stage ? `<small>${highlightedText(leagueMatches[0].stage)}</small>` : ""}</span>
         <span class="league-count">${leagueMatches.length}</span>
         <span class="league-chevron" aria-hidden="true">⌄</span>
       </button>
@@ -489,6 +680,25 @@ function renderMatches() {
   document.querySelector("#finished-count").textContent = matches.filter(({ state }) => state === "post").length;
   document.querySelector("#favorites-count").textContent = matches.filter(({ id }) => favorites.has(id)).length;
   document.querySelector("#broadcast-count").textContent = matches.filter(({ hasBroadcast }) => hasBroadcast).length;
+  document.querySelectorAll(".status-tab[data-status]").forEach((button) => {
+    const aliases = { upcoming: "pre", finished: "post" };
+    const selected = (aliases[activeStatus] || activeStatus) === button.dataset.status;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", String(selected));
+  });
+  document.querySelectorAll(".nav-link[data-view]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === activeStatus);
+  });
+  document.querySelectorAll(".status-tab[data-status]").forEach((button) => {
+    const count = button.dataset.status === "all" ? matches.length
+      : button.dataset.status === "live" ? matches.filter(({ state }) => state === "in").length
+        : button.dataset.status === "pre" ? matches.filter(({ state }) => state === "pre").length
+          : button.dataset.status === "post" ? matches.filter(({ state }) => state === "post").length
+            : button.dataset.status === "favorites" ? matches.filter(({ id }) => favorites.has(id)).length
+              : matches.filter(({ hasBroadcast }) => hasBroadcast).length;
+    button.disabled = count === 0 && button.dataset.status !== activeStatus;
+  });
+  announceScoreChanges([...new Map([...matches, ...liveScoreMatches].map((match) => [match.id, match])).values()]);
   renderCompetitionFilters();
   renderDates();
   renderLiveBoard();
@@ -496,7 +706,7 @@ function renderMatches() {
 }
 
 function setActiveStatus(status) {
-  activeStatus = status;
+  activeStatus = ({ upcoming: "pre", finished: "post" })[status] || status;
   document.querySelectorAll("[data-status]").forEach((button) => {
     const statusAliases = { live: "live", upcoming: "pre", finished: "post" };
     const selected = button.dataset.status === (statusAliases[status] || status);
@@ -508,6 +718,7 @@ function setActiveStatus(status) {
     button.classList.toggle("active", viewStatus === status);
   });
   renderMatches();
+  syncUrlState();
 }
 
 function setLoading(isLoading) {
@@ -517,6 +728,16 @@ function setLoading(isLoading) {
 
 function renderUpdatedTime() {
   document.querySelector("#updated-label").textContent = `Updated ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date())}`;
+}
+
+function scheduleRefresh() {
+  window.clearTimeout(refreshTimeout);
+  if (document.hidden) return;
+  const hasLiveMatch = [...matches, ...liveScoreMatches].some((match) => match.state === "in");
+  refreshTimeout = window.setTimeout(() => {
+    refreshTimeout = 0;
+    loadMatches();
+  }, hasLiveMatch ? LIVE_REFRESH_INTERVAL : REFRESH_INTERVAL);
 }
 
 async function loadMatches({ force = false } = {}) {
@@ -568,13 +789,27 @@ async function loadMatches({ force = false } = {}) {
     liveScoreMatches = [...currentDayEvents.values()].map(normalizeMatch);
     for (const match of [...matches, ...liveScoreMatches]) matchCache.set(match.id, match);
     if (!selectedMatchId || !matches.some((match) => match.id === selectedMatchId)) {
-      selectedMatchId = null;
-      showEmptyDetail();
+      if (!selectedMatchId || !matchCache.has(selectedMatchId)) {
+        selectedMatchId = null;
+        showEmptyDetail();
+      }
     }
+    announceScoreChanges([...new Map([...matches, ...liveScoreMatches].map((match) => [match.id, match])).values()]);
     setFeedStatus("connected", "SCORES CONNECTED");
     document.querySelector("#error-banner").hidden = true;
+    lastSuccessfulFetchAt = Date.now();
     renderMatches();
     renderUpdatedTime();
+    if (!selectedMatchId && !hasAutoSelectedMatch && window.matchMedia("(min-width: 721px)").matches) {
+      const defaultMatch = selectDefaultMatch();
+      hasAutoSelectedMatch = true;
+      if (defaultMatch) {
+        selectedMatchId = defaultMatch.id;
+        renderMatches();
+      }
+    } else if (selectedMatchId && !hasAutoSelectedMatch) {
+      hasAutoSelectedMatch = true;
+    }
     if (selectedMatchId) {
       renderDetail();
       if (matchCache.get(selectedMatchId)?.state === "in") {
@@ -587,7 +822,13 @@ async function loadMatches({ force = false } = {}) {
     if (error.name === "AbortError" || requestDate !== selectedDate) return;
     console.error("Unable to load football scores.", error);
     setFeedStatus("offline", "SCORES UNAVAILABLE");
-    document.querySelector("#error-message").textContent = `${error.message} Check your connection and retry.`;
+    const staleMessage = lastSuccessfulFetchAt
+      ? ` Showing scores last updated ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(lastSuccessfulFetchAt)}.`
+      : "";
+    document.querySelector("#error-message").textContent = `${error.message} Check your connection and retry.${staleMessage}`;
+    if (lastSuccessfulFetchAt) {
+      document.querySelector("#updated-label").textContent = `Data may be stale · last updated ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(lastSuccessfulFetchAt)}`;
+    }
     document.querySelector("#error-banner").hidden = false;
     if (!matches.length) {
       listElement.hidden = true;
@@ -598,6 +839,7 @@ async function loadMatches({ force = false } = {}) {
       requestInProgress = false;
       document.querySelector("#refresh-button").classList.remove("is-refreshing");
       setLoading(false);
+      scheduleRefresh();
     }
   }
 }
@@ -610,6 +852,7 @@ function showEmptyDetail() {
   panel.removeAttribute("role");
   panel.removeAttribute("aria-modal");
   document.body.classList.remove("detail-open");
+  document.body.classList.remove("detail-modal-open");
 }
 
 function showToast(message) {
@@ -621,9 +864,14 @@ function showToast(message) {
 }
 
 function closeMatchDetail() {
+  if (window.history.state?.touchlineMatch) {
+    window.history.back();
+    return;
+  }
   const closedMatchId = selectedMatchId;
   selectedMatchId = null;
   showEmptyDetail();
+  syncUrlState();
   renderMatches();
   const trigger = [...document.querySelectorAll(".match-select, [data-live-match]")]
     .find((element) => element.closest("[data-match]")?.dataset.match === closedMatchId
@@ -1055,11 +1303,14 @@ function renderDetail() {
   if (!match) return showEmptyDetail();
   const panel = document.querySelector("#match-panel");
   const wasOpen = document.body.classList.contains("detail-open");
+  const modal = window.matchMedia("(max-width: 720px)").matches;
   const detail = detailCache.get(match.id);
   detailEmptyElement.hidden = true;
   detailElement.hidden = false;
   panel.setAttribute("role", "dialog");
-  panel.setAttribute("aria-modal", "true");
+  if (modal) panel.setAttribute("aria-modal", "true");
+  else panel.removeAttribute("aria-modal");
+  document.body.classList.toggle("detail-modal-open", modal);
   document.body.classList.add("detail-open");
   detailElement.innerHTML = `
     <div class="detail-header">
@@ -1095,7 +1346,7 @@ function renderDetail() {
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91L12 3Z"></path></svg>
       ${favorites.has(match.id) ? "Following match" : "Follow match"}
     </button>`;
-  if (!wasOpen) panel.querySelector(".detail-close").focus();
+  if (!wasOpen && modal) panel.querySelector(".detail-close").focus();
 }
 
 async function loadMatchDetails(match) {
@@ -1117,9 +1368,15 @@ async function loadMatchDetails(match) {
 }
 
 function selectMatch(matchId) {
+  if (selectedMatchId === matchId) {
+    if (!window.history.state?.touchlineMatch) syncUrlState({ push: true });
+    renderDetail();
+    return;
+  }
   selectedMatchId = matchId;
   selectedDetailTab = "overview";
   selectedEventFilter = "all";
+  syncUrlState({ push: true });
   renderMatches();
   renderDetail();
   const match = matchCache.get(matchId);
@@ -1142,16 +1399,34 @@ function toggleFavorite(matchId) {
   showToast(`${following ? "Following" : "Unfollowed"} ${match ? `${match.home.shortName} vs ${match.away.shortName}` : "match"}`);
 }
 
-document.querySelector("#date-strip").addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-date]");
-  if (!button || button.dataset.date === selectedDate) return;
-  selectedDate = button.dataset.date;
+function changeDate(date) {
+  if (!date || date === selectedDate) return;
+  selectedDate = date;
   matches = [];
   selectedMatchId = null;
+  hasAutoSelectedMatch = false;
   showEmptyDetail();
+  syncUrlState({ push: true });
   renderMatches();
   setLoading(true);
   loadMatches({ force: true });
+}
+
+function selectDefaultMatch() {
+  const now = Date.now();
+  const live = matches.filter((match) => match.state === "in");
+  const upcoming = matches.filter((match) => match.state === "pre" && new Date(match.date).getTime() >= now)
+    .sort((a, b) => compareCompetitionPriority(a, b) || new Date(a.date) - new Date(b.date));
+  const followed = matches.filter((match) => favorites.has(match.id))
+    .sort((a, b) => compareCompetitionPriority(a, b) || new Date(a.date) - new Date(b.date));
+  const latest = matches.filter((match) => match.state === "post")
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  return live[0] || upcoming[0] || followed[0] || latest[0] || null;
+}
+
+document.querySelector("#date-strip").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-date]");
+  if (button) changeDate(button.dataset.date);
 });
 
 document.querySelector(".date-strip-wrap").addEventListener("click", (event) => {
@@ -1159,24 +1434,11 @@ document.querySelector(".date-strip-wrap").addEventListener("click", (event) => 
   if (!button) return;
   const date = fromDateKey(selectedDate);
   date.setDate(date.getDate() + Number(button.dataset.dayStep));
-  selectedDate = toDateKey(date);
-  matches = [];
-  selectedMatchId = null;
-  showEmptyDetail();
-  renderMatches();
-  setLoading(true);
-  loadMatches({ force: true });
+  changeDate(toDateKey(date));
 });
 
 datePicker.addEventListener("change", () => {
-  if (!datePicker.value || datePicker.value === selectedDate) return;
-  selectedDate = datePicker.value;
-  matches = [];
-  selectedMatchId = null;
-  showEmptyDetail();
-  renderMatches();
-  setLoading(true);
-  loadMatches({ force: true });
+  changeDate(datePicker.value);
 });
 
 document.querySelectorAll("[data-status]").forEach((button) => {
@@ -1192,11 +1454,19 @@ document.querySelector(".competition-sidebar").addEventListener("click", (event)
   if (!button) return;
   activeCompetition = button.dataset.competition;
   renderMatches();
+  syncUrlState();
 });
 
-document.querySelector("#clear-competition").addEventListener("click", () => {
+document.querySelector("#clear-filters").addEventListener("click", () => {
+  window.clearTimeout(searchTimeout);
+  activeStatus = "all";
   activeCompetition = "all";
+  searchTerm = "";
+  searchInput.value = "";
+  competitionSearchTerm = "";
+  competitionSearchInput.value = "";
   renderMatches();
+  syncUrlState();
 });
 
 listElement.addEventListener("click", (event) => {
@@ -1209,8 +1479,13 @@ listElement.addEventListener("click", (event) => {
   }
   const leagueButton = event.target.closest(".league-heading");
   if (leagueButton) {
+    if (leagueButton.dataset.view) {
+      setActiveStatus(leagueButton.dataset.view);
+      return;
+    }
     activeCompetition = activeCompetition === leagueButton.dataset.league ? "all" : leagueButton.dataset.league;
     renderMatches();
+    syncUrlState();
     return;
   }
   const matchButton = event.target.closest(".match-select");
@@ -1272,8 +1547,16 @@ detailElement.addEventListener("click", (event) => {
 });
 
 searchInput.addEventListener("input", () => {
-  searchTerm = searchInput.value.trim();
-  renderMatches();
+  window.clearTimeout(searchTimeout);
+  searchTimeout = window.setTimeout(() => {
+    searchTerm = searchInput.value.trim();
+    renderMatches();
+  }, SEARCH_DEBOUNCE);
+});
+
+competitionSearchInput.addEventListener("input", () => {
+  competitionSearchTerm = competitionSearchInput.value.trim().toLocaleLowerCase();
+  renderCompetitionFilters();
 });
 
 document.querySelector("#refresh-button").addEventListener("click", () => loadMatches({ force: true }));
@@ -1290,6 +1573,54 @@ themeOptions.forEach((option) => {
 
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".theme-picker")) setThemeMenuOpen(false);
+});
+
+window.addEventListener("popstate", () => {
+  const route = readRouteState();
+  const dateChanged = route.date !== selectedDate;
+  selectedDate = route.date;
+  activeStatus = route.status;
+  activeCompetition = route.competition;
+  selectedMatchId = route.match || null;
+  if (dateChanged || !selectedMatchId) showEmptyDetail();
+  renderMatches();
+  if (dateChanged) {
+    matches = [];
+    hasAutoSelectedMatch = true;
+    setLoading(true);
+    loadMatches({ force: true });
+  } else if (selectedMatchId && matchCache.has(selectedMatchId)) {
+    renderDetail();
+    loadMatchDetails(matchCache.get(selectedMatchId));
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    window.clearTimeout(refreshTimeout);
+    refreshTimeout = 0;
+    scoreRequestController?.abort();
+  } else {
+    loadMatches({ force: true });
+  }
+});
+
+window.addEventListener("resize", () => {
+  const modal = window.matchMedia("(max-width: 720px)").matches;
+  document.body.classList.toggle("detail-modal-open", Boolean(selectedMatchId) && modal);
+  const panel = document.querySelector("#match-panel");
+  if (selectedMatchId && modal) panel.setAttribute("aria-modal", "true");
+  else panel.removeAttribute("aria-modal");
+  if (!hasAutoSelectedMatch && matches.length && window.matchMedia("(min-width: 721px)").matches) {
+    const match = selectDefaultMatch();
+    hasAutoSelectedMatch = true;
+    if (match) {
+      selectedMatchId = match.id;
+      renderMatches();
+      renderDetail();
+      loadMatchDetails(match);
+    }
+  }
 });
 
 document.addEventListener("keydown", (event) => {
@@ -1383,7 +1714,4 @@ window.addEventListener("scroll", () => {
 
 renderDates();
 renderMatches();
-loadMatches();
-window.setInterval(() => {
-  if (!document.hidden) loadMatches();
-}, REFRESH_INTERVAL);
+loadMatches().finally(scheduleRefresh);

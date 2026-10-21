@@ -19,12 +19,9 @@
           </a>
           <nav class="main-nav" aria-label="Main navigation">
             <button class="nav-link active" type="button" data-view="all">Scores</button>
-            <button class="nav-link" type="button" data-view="live">Live</button>
-            <button class="nav-link" type="button" data-view="favorites">Following</button>
-            <button class="nav-link" type="button" data-view="finished">Results</button>
           </nav>
           <div class="topbar-right">
-            <span class="feed-status loading" id="feed-status"><span class="status-dot"></span><span id="feed-status-text">CONNECTING TO SCORES</span></span>
+            <span class="feed-status loading" id="feed-status" title="Updating match scores"><span class="status-dot"></span><span id="feed-status-text">CONNECTING TO SCORES</span></span>
             <div class="theme-picker">
               <button class="icon-button theme-button" id="theme-button" type="button" aria-label="Choose color theme" aria-haspopup="menu" aria-expanded="false" aria-controls="theme-menu" title="Choose color theme">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.1 2.1 0 0 0 1.5-3.6 1.5 1.5 0 0 1 1.1-2.5H18a3 3 0 0 0 3-3c0-5-4-8.9-9-8.9Z"></path><circle cx="7.5" cy="11" r="1"></circle><circle cx="10" cy="7.5" r="1"></circle><circle cx="14.5" cy="8" r="1"></circle><circle cx="17" cy="11.5" r="1"></circle></svg>
@@ -73,7 +70,7 @@
           <button class="date-step" type="button" data-day-step="-1" aria-label="Previous day">‹</button>
           <div class="date-strip" id="date-strip"></div>
           <button class="date-step" type="button" data-day-step="1" aria-label="Next day">›</button>
-          <label class="calendar-button" title="Choose any date">
+          <label class="calendar-button" title="Choose any date" aria-label="Choose any match date">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M7.5 3v4M16.5 3v4M4 9.5h16"></path></svg>
             <input id="date-picker" type="date" aria-label="Choose any date">
           </label>
@@ -89,7 +86,7 @@
           </div>
           <div class="live-board-grid" id="live-board-grid"></div>
           <div class="live-board-empty" id="live-board-empty" hidden>
-            <span>Quiet on the pitch right now.</span>
+            <span id="live-board-empty-copy">No matches are live right now.</span>
             <button type="button" data-view="all">Browse today’s fixtures <span aria-hidden="true">→</span></button>
           </div>
         </section>
@@ -97,9 +94,10 @@
         <div class="dashboard-grid">
           <aside class="competition-sidebar" aria-label="Competition filters">
             <div class="sidebar-heading">
-              <span>COMPETITIONS</span>
-              <button class="text-button" type="button" id="clear-competition">Clear</button>
+              <span>COMPETITIONS <span class="sidebar-filter-count" id="active-filter-count">0 active</span></span>
+              <button class="text-button" type="button" id="clear-filters">Clear filters</button>
             </div>
+            <label class="competition-search"><span class="visually-hidden">Filter competitions</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"></circle><path d="m15.5 15.5 4 4"></path></svg><input id="competition-search" type="search" placeholder="Find a competition" autocomplete="off"></label>
             <button class="competition-option selected" type="button" data-competition="all" aria-pressed="true">
               <span class="competition-icon all-icon" aria-hidden="true">✳</span>
               <span class="competition-option-label">All competitions</span>
@@ -128,10 +126,10 @@
                 <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="pre">Upcoming <span id="upcoming-count">—</span></button>
                 <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="post">Finished <span id="finished-count">—</span></button>
                 <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="favorites">Following <span id="favorites-count">—</span></button>
-                <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="broadcast">Broadcast <span id="broadcast-count">—</span></button>
+                <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="broadcast">On TV <span id="broadcast-count">—</span></button>
                 <label class="search-box">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"></circle><path d="m15.5 15.5 4 4"></path></svg>
-                  <input id="match-search" type="search" placeholder="Search teams or competitions…" autocomplete="off" aria-label="Search teams or competitions">
+                  <input id="match-search" type="search" placeholder="Search teams, leagues" autocomplete="off" aria-label="Search teams and leagues">
                   <kbd>/</kbd>
                 </label>
               </div>
@@ -140,7 +138,7 @@
                 <span id="error-message"></span>
                 <button id="retry-button" type="button">Try again</button>
               </div>
-              <div class="match-list" id="match-list" aria-live="polite"></div>
+              <div class="match-list" id="match-list"></div>
               <div class="empty-state" id="empty-state" hidden>
                 <span class="empty-icon" aria-hidden="true">⌕</span>
                 <strong id="empty-title">No matches found</strong>
@@ -149,10 +147,11 @@
               <div class="loading-state" id="loading-state">
                 <span class="loading-spinner" aria-hidden="true"></span>
                 <span>Fetching fixtures and scores…</span>
+                <div class="skeleton-list" aria-hidden="true"><i></i><i></i><i></i></div>
               </div>
               <div class="scores-card-footer">
                 <span class="footer-info-icon">i</span>
-                <span>Automatically refreshes every minute. Match clocks and scores come from the live data feed.</span>
+                <span>Refreshes every 15 seconds during live matches and every minute otherwise. Match clocks and scores come from the live data feed.</span>
               </div>
             </div>
           </section>
@@ -174,6 +173,7 @@
         </footer>
       </main>
     </div>
+    <span class="visually-hidden" id="score-announcer" aria-live="polite" aria-atomic="true"></span>
     <div class="action-toast" id="action-toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </body>
 </html>
