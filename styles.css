@@ -2323,3 +2323,92 @@ body.neon-theme .detail-scoreboard .detail-team-badge:has(img) {
     height: 34px;
   }
 }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0,0,0,0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.sidebar-heading {
+  height: auto;
+  min-height: 40px;
+  padding: 0 3px 9px;
+  gap: 8px;
+  letter-spacing: .06em;
+}
+.sidebar-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sidebar-filter-count {
+  font: 10px var(--sans);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.competition-sidebar > .sidebar-heading .text-button {
+  min-height: 30px;
+  flex: none;
+  padding: 0 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.competition-sidebar > .sidebar-heading .text-button:not(:disabled):hover {
+  border-color: var(--lime);
+}
+.competition-search {
+  min-width: 0;
+  height: 39px;
+  margin: 0 1px 9px;
+  padding-inline: 9px;
+  gap: 7px;
+}
+.competition-search input {
+  min-width: 0;
+  font-size: 11px;
+}
+.competition-search input::placeholder { opacity: .85; }
+.competition-sidebar > .competition-option {
+  min-height: 43px;
+  margin-bottom: 3px;
+  padding: 5px 8px;
+  gap: 8px;
+}
+.competition-list { min-width: 0; }
+.competition-group-label {
+  padding: 12px 8px 6px;
+  line-height: 1.2;
+}
+.competition-group-label:first-child { padding-top: 8px; }
+.competition-list .competition-option {
+  min-height: 42px;
+  padding: 4px 7px;
+  gap: 8px;
+}
+.competition-option .league-logo {
+  width: 31px;
+  height: 31px;
+}
+.competition-list .competition-option-label,
+.competition-list .competition-count { font-size: 11px; }
+.competition-count { flex: none; }
+.sidebar-divider { margin: 12px 4px 9px; }
+.sidebar-note { padding: 4px 5px 3px; }
+
+@media (max-width: 960px) {
+  .sidebar-heading { min-height: 38px; padding-bottom: 7px; }
+  .competition-sidebar > .competition-option { margin-bottom: 0; }
+  .competition-list .competition-option {
+    min-height: 40px;
+    padding: 4px 8px;
+  }
+}
