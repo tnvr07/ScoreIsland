@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#071117">
     <meta name="description" content="Football scores, fixtures, match events, statistics and lineups from around the world.">
+    <meta name="theme-color" content="#071117">
     <title>Touchline — Football Scores</title>
     <link rel="stylesheet" href="styles.css">
     <script src="app.js" defer></script>
@@ -58,6 +58,7 @@
             <p class="eyebrow"><span class="eyebrow-line"></span> THE BEAUTIFUL GAME, IN REAL TIME</p>
             <h1>Football <span>center</span></h1>
             <p class="page-description">Live scores, fixtures and results from competitions around the world.</p>
+            <p class="interaction-hint" aria-label="Keyboard shortcuts"><kbd>J</kbd><kbd>K</kbd> browse <span>·</span> <kbd>F</kbd> follow <span>·</span> <kbd>/</kbd> search <span>·</span> <kbd>?</kbd> shortcuts</p>
           </div>
           <div class="heading-actions">
             <span class="updated-label" id="updated-label">Waiting for scores</span>
@@ -173,5 +174,6 @@
         </footer>
       </main>
     </div>
+    <div class="action-toast" id="action-toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </body>
 </html>

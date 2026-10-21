@@ -49,6 +49,7 @@ let requestInProgress = false;
 let scoreRequestController = null;
 let selectedDetailTab = "overview";
 let selectedEventFilter = "all";
+let toastTimeout = 0;
 
 function toDateKey(date) {
   const year = date.getFullYear();
@@ -525,6 +526,7 @@ async function loadMatches({ force = false } = {}) {
   scoreRequestController = controller;
   const requestDate = selectedDate;
   requestInProgress = true;
+  document.querySelector("#refresh-button").classList.add("is-refreshing");
   setLoading(matches.length === 0);
   setFeedStatus("loading", "UPDATING SCORES");
   document.querySelector("#error-banner").hidden = true;
@@ -594,6 +596,7 @@ async function loadMatches({ force = false } = {}) {
   } finally {
     if (scoreRequestController === controller) {
       requestInProgress = false;
+      document.querySelector("#refresh-button").classList.remove("is-refreshing");
       setLoading(false);
     }
   }
@@ -607,6 +610,14 @@ function showEmptyDetail() {
   panel.removeAttribute("role");
   panel.removeAttribute("aria-modal");
   document.body.classList.remove("detail-open");
+}
+
+function showToast(message) {
+  const toast = document.querySelector("#action-toast");
+  toast.textContent = message;
+  toast.classList.add("visible");
+  window.clearTimeout(toastTimeout);
+  toastTimeout = window.setTimeout(() => toast.classList.remove("visible"), 2300);
 }
 
 function closeMatchDetail() {
@@ -1116,8 +1127,9 @@ function selectMatch(matchId) {
 }
 
 function toggleFavorite(matchId) {
-  if (favorites.has(matchId)) favorites.delete(matchId);
-  else favorites.add(matchId);
+  const following = !favorites.has(matchId);
+  if (following) favorites.add(matchId);
+  else favorites.delete(matchId);
   try {
     localStorage.setItem("touchline-favorites", JSON.stringify([...favorites]));
   } catch (error) {
@@ -1126,6 +1138,8 @@ function toggleFavorite(matchId) {
   matches.forEach((match) => { match.favorite = favorites.has(match.id); });
   renderMatches();
   if (selectedMatchId === matchId) renderDetail();
+  const match = matchCache.get(matchId);
+  showToast(`${following ? "Following" : "Unfollowed"} ${match ? `${match.home.shortName} vs ${match.away.shortName}` : "match"}`);
 }
 
 document.querySelector("#date-strip").addEventListener("click", (event) => {
@@ -1270,6 +1284,7 @@ themeOptions.forEach((option) => {
     applyTheme(option.dataset.themeChoice);
     setThemeMenuOpen(false);
     themeButton.focus();
+    showToast(`${THEME_NAMES[option.dataset.themeChoice]} theme applied`);
   });
 });
 
@@ -1278,6 +1293,34 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  const typing = event.target instanceof HTMLElement
+    && (event.target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName));
+  if (!typing && themeMenu.hidden && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    if (event.key === "?") {
+      event.preventDefault();
+      showToast("Shortcuts: / search · J/K browse matches · F follow · Esc close");
+      return;
+    }
+    if (event.key.toLowerCase() === "f" && selectedMatchId) {
+      event.preventDefault();
+      toggleFavorite(selectedMatchId);
+      return;
+    }
+    if (["j", "k"].includes(event.key.toLowerCase())) {
+      const orderedMatches = visibleMatches().sort((first, second) =>
+        new Date(first.date) - new Date(second.date));
+      if (orderedMatches.length) {
+        event.preventDefault();
+        const currentIndex = orderedMatches.findIndex((match) => match.id === selectedMatchId);
+        const step = event.key.toLowerCase() === "j" ? 1 : -1;
+        const nextIndex = currentIndex < 0
+          ? (step > 0 ? 0 : orderedMatches.length - 1)
+          : (currentIndex + step + orderedMatches.length) % orderedMatches.length;
+        selectMatch(orderedMatches[nextIndex].id);
+      }
+      return;
+    }
+  }
   if (!themeMenu.hidden) {
     if (event.key === "Escape") {
       setThemeMenuOpen(false);
@@ -1323,6 +1366,20 @@ document.addEventListener("keydown", (event) => {
     closeMatchDetail();
   }
 });
+
+document.addEventListener("pointermove", (event) => {
+  if (event.pointerType !== "mouse") return;
+  if (!(event.target instanceof Element)) return;
+  const card = event.target.closest(".match-row, .live-card, .date-choice, .competition-option");
+  if (!card) return;
+  const rect = card.getBoundingClientRect();
+  card.style.setProperty("--pointer-x", `${event.clientX - rect.left}px`);
+  card.style.setProperty("--pointer-y", `${event.clientY - rect.top}px`);
+}, { passive: true });
+
+window.addEventListener("scroll", () => {
+  document.body.classList.toggle("scrolled", window.scrollY > 12);
+}, { passive: true });
 
 renderDates();
 renderMatches();
