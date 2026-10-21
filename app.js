@@ -346,6 +346,10 @@ function leagueLogoKey(leagueId, name) {
   return String(leagueId || name || "");
 }
 
+function isChampionsLeague(leagueId, name) {
+  return String(leagueId) === "775" || /uefa champions league/i.test(name ?? "");
+}
+
 function leagueLogoFromDetail(detail) {
   return detail?.header?.league?.logos?.find((logo) =>
     logo.href?.startsWith("https://")
@@ -355,6 +359,9 @@ function leagueLogoFromDetail(detail) {
 }
 
 function leagueLogoUrl(leagueId, name) {
+  if (isChampionsLeague(leagueId, name)) {
+    return "assets/champions-league-starball.png";
+  }
   return leagueLogoCache.get(leagueLogoKey(leagueId, name)) || "";
 }
 
@@ -1315,7 +1322,9 @@ function detailMetadataMarkup(match, detail) {
   const timeLabel = validDate
     ? new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date)
     : "Time TBC";
-  const leagueLogo = leagueLogoFromDetail(detail) || leagueLogoUrl(match.leagueId, match.league);
+  const leagueLogo = isChampionsLeague(match.leagueId, match.league)
+    ? leagueLogoUrl(match.leagueId, match.league)
+    : leagueLogoFromDetail(detail) || leagueLogoUrl(match.leagueId, match.league);
   const broadcasts = detailBroadcastNames(match, detail, competition);
   const broadcastLabel = broadcasts.length
     ? `${broadcasts.slice(0, 2).join(", ")}${broadcasts.length > 2 ? ` +${broadcasts.length - 2}` : ""}`

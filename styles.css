@@ -129,8 +129,8 @@ h1 span { color: #81877c; }
 .league-logo { flex: none; display: grid; place-items: center; overflow: hidden; }
 .league-logo img { width: 100%; height: 100%; display: block; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,.28)); }
 .league-logo-fallback, .league-logo-text { width: 100%; height: 100%; display: grid; place-items: center; color: var(--lime); font-size: 16px; font-weight: 700; }
-.competition-option .league-logo { width: 30px; height: 30px; }
-.league-heading .league-logo { width: 36px; height: 36px; }
+.competition-option .league-logo { width: 36px; height: 36px; }
+.league-heading .league-logo { width: 40px; height: 40px; }
 .all-icon { color: var(--lime); }
 .competition-option-label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 500; }
 .competition-count { color: var(--faint); font: 9px var(--mono); }
