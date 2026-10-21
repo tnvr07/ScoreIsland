@@ -634,13 +634,23 @@ function renderLiveScoreStrip() {
   const strip = document.querySelector("#live-score-strip");
   const track = document.querySelector("#live-score-strip-track");
   const count = document.querySelector("#live-score-strip-count");
-  const liveMatches = liveScoreMatches
-    .filter(({ state }) => state === "in")
-    .sort((a, b) => compareCompetitionPriority(a, b) || new Date(a.date) - new Date(b.date));
-  document.body.classList.toggle("has-live-scores", liveMatches.length > 0);
-  strip.hidden = liveMatches.length === 0;
-  count.textContent = liveMatches.length;
-  track.innerHTML = liveMatches.map((match) => {
+  const matchesToday = [...liveScoreMatches].sort((a, b) => {
+    const stateOrder = { in: 0, pre: 1, post: 2 };
+    return (stateOrder[a.state] ?? 3) - (stateOrder[b.state] ?? 3)
+      || compareCompetitionPriority(a, b)
+      || new Date(a.date) - new Date(b.date);
+  });
+  const liveCount = matchesToday.filter(({ state }) => state === "in").length;
+  document.body.classList.toggle("has-live-scores", liveCount > 0);
+  count.textContent = liveCount ? `${liveCount} LIVE` : "";
+  count.hidden = liveCount === 0;
+  track.setAttribute("aria-label", `Today's matches${liveCount ? `, ${liveCount} live` : ""}`);
+  if (!matchesToday.length) {
+    track.innerHTML = `<span class="live-score-strip-empty">${liveScoreMatches.length === 0 ? "No matches scheduled today" : "Loading today's matches…"}</span>`;
+    updateLiveScoreArrows();
+    return;
+  }
+  track.innerHTML = matchesToday.map((match) => {
     const home = match.home.shortName || match.home.name;
     const away = match.away.shortName || match.away.name;
     const homeCrest = match.home.logo
@@ -649,14 +659,25 @@ function renderLiveScoreStrip() {
     const awayCrest = match.away.logo
       ? `<img src="${escapeHTML(match.away.logo)}" alt="" loading="lazy">`
       : `<span class="live-score-item-initials">${escapeHTML(away.slice(0, 2))}</span>`;
-    return `<button class="live-score-item" type="button" data-live-strip-match="${escapeHTML(match.id)}" aria-label="Open ${escapeHTML(match.home.name)} ${escapeHTML(match.home.score ?? "0")}–${escapeHTML(match.away.score ?? "0")} ${escapeHTML(match.away.name)}, ${escapeHTML(match.displayClock || match.status)}">
+    const matchStatus = match.state === "in"
+      ? match.displayClock || match.status
+      : match.state === "post"
+        ? match.status === "Final" ? "FT" : match.status
+        : timeLabel(match.date);
+    const score = match.state === "pre"
+      ? `<span class="live-score-item-upcoming">VS</span>`
+      : `<strong class="live-score-item-score">${escapeHTML(match.home.score ?? "0")}<span>–</span>${escapeHTML(match.away.score ?? "0")}</strong>`;
+    const accessibleScore = match.state === "pre"
+      ? `kickoff ${matchStatus}`
+      : `${match.home.score ?? "0"} to ${match.away.score ?? "0"}`;
+    return `<button class="live-score-item ${escapeHTML(match.state)}" type="button" data-live-strip-match="${escapeHTML(match.id)}" aria-label="Open ${escapeHTML(match.home.name)} ${accessibleScore} ${escapeHTML(match.away.name)}, ${escapeHTML(matchStatus)}">
       <span class="live-score-item-league">${escapeHTML(match.league)}</span>
       <span class="live-score-item-match">
         <span class="live-score-item-team">${homeCrest}<span>${escapeHTML(home)}</span></span>
-        <strong class="live-score-item-score">${escapeHTML(match.home.score ?? "0")}<span>–</span>${escapeHTML(match.away.score ?? "0")}</strong>
+        ${score}
         <span class="live-score-item-team away">${awayCrest}<span>${escapeHTML(away)}</span></span>
       </span>
-      <span class="live-score-item-clock"><span class="clock-dot"></span>${escapeHTML(match.displayClock || match.status)}</span>
+      <span class="live-score-item-clock"><span class="clock-dot"></span>${escapeHTML(matchStatus)}</span>
     </button>`;
   }).join("");
   updateLiveScoreArrows();
@@ -667,7 +688,8 @@ function updateLiveScoreArrows() {
   const previous = document.querySelector('[data-live-scroll="-1"]');
   const next = document.querySelector('[data-live-scroll="1"]');
   previous.disabled = track.scrollLeft <= 0;
-  next.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
+  next.disabled = track.scrollWidth <= track.clientWidth
+    || track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
 }
 
 function renderMatches() {

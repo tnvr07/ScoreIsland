@@ -2002,3 +2002,102 @@ body.detail-open:not(.detail-modal-open) .shot-map-heading h3 { font-size: 15px;
 @media (prefers-reduced-motion: reduce) {
   .score.score-updated { animation: none; }
 }
+
+/* Match-centre inspired header: today's fixtures, brand controls, then match filters. */
+:root { --header-sticky-offset: 218px; }
+.site-header { display: flex; flex-direction: column; }
+.topbar { order: 2; }
+.live-score-strip { order: 1; }
+.header-status-nav.status-tabs {
+  min-height: 54px;
+  padding: 0;
+  gap: 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-soft);
+  scrollbar-width: none;
+  order: 3;
+}
+.header-status-nav.status-tabs::-webkit-scrollbar { display: none; }
+.header-status-nav .status-tab {
+  min-height: 54px;
+  position: relative;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 0;
+  font-size: 12px;
+}
+.header-status-nav .status-tab:hover:not(:disabled) { color: var(--text); }
+.header-status-nav .status-tab.active { background: transparent; color: var(--text); }
+.header-status-nav .status-tab.active::after {
+  position: absolute;
+  right: 12px;
+  bottom: -1px;
+  left: 12px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--lime);
+  content: "";
+}
+.header-status-nav .status-tab.active > span:not(.tab-dot) { color: var(--lime); }
+.header-status-nav .status-tab:disabled { opacity: .48; cursor: default; }
+.header-search { width: clamp(190px, 18vw, 250px); max-width: none; margin-left: 0; }
+.topbar-right { gap: 12px; }
+.live-score-strip-heading { min-width: 78px; }
+.live-score-strip-count { font: 700 9px var(--sans); letter-spacing: 0; }
+.live-score-strip-indicator { background: color-mix(in srgb, var(--green), transparent 84%); }
+.live-score-strip-indicator span { background: var(--green); box-shadow: none; animation: none; }
+.has-live-scores .live-score-strip-indicator { background: rgba(255,115,125,.16); }
+.has-live-scores .live-score-strip-indicator span {
+  background: var(--red);
+  box-shadow: 0 0 8px rgba(255,115,125,.65);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.live-score-strip-empty { padding: 0 12px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.live-score-item { position: relative; }
+.live-score-item.in { border-color: color-mix(in srgb, var(--red), transparent 48%); }
+.live-score-item-clock { color: var(--muted); font-size: 10px; }
+.live-score-item-clock .clock-dot { display: none; }
+.live-score-item.in .live-score-item-clock { color: var(--red); }
+.live-score-item.in .live-score-item-clock .clock-dot { display: block; background: var(--red); box-shadow: 0 0 7px rgba(255,115,125,.5); }
+.live-score-item.pre .live-score-item-clock { color: var(--green); }
+.live-score-item-upcoming { color: var(--faint); font: 700 11px var(--mono); }
+.live-score-item-match { gap: 9px; }
+.live-score-item-team { font-size: 11px; }
+.live-score-item-score { font-size: 14px; }
+.scores-card-heading { gap: 12px; }
+body.light-theme .header-status-nav .status-tab.active { background: transparent; color: var(--text); }
+
+@media (max-width: 960px) {
+  .header-search { width: clamp(160px, 24vw, 220px); }
+}
+@media (max-width: 720px) {
+  :root { --header-sticky-offset: 180px; }
+  .site-header, .live-score-strip { padding-inline: 14px; }
+  .topbar { height: 62px; gap: 8px; }
+  .main-nav { display: none; }
+  .topbar-right { gap: 8px; margin-left: auto; }
+  .header-search { width: clamp(130px, 43vw, 210px); min-width: 0; height: 36px; padding-inline: 8px; }
+  .header-search kbd { display: none; }
+  .theme-button { width: 38px; height: 38px; padding: 0; }
+  .theme-current, .theme-chevron { display: none; }
+  .live-score-strip { height: 70px; gap: 7px; }
+  .live-score-strip-heading { min-width: auto; gap: 6px; font-size: 9px; }
+  .live-score-strip-arrow { width: 25px; height: 25px; }
+  .live-score-item { width: 190px; min-width: 190px; min-height: 54px; padding: 7px 9px; }
+  .live-score-item-league { font-size: 9px; }
+  .live-score-item-team { font-size: 10px; }
+  .live-score-item-clock { font-size: 9px; }
+  .header-status-nav.status-tabs { min-height: 48px; gap: 2px; }
+  .header-status-nav .status-tab { min-height: 48px; padding-inline: 11px; font-size: 11px; }
+  .header-status-nav .status-tab.active::after { right: 9px; left: 9px; }
+}
+@media (max-width: 390px) {
+  :root { --header-sticky-offset: 176px; }
+  .site-header, .live-score-strip { padding-inline: 10px; }
+  .header-search { width: clamp(118px, 40vw, 150px); }
+  .topbar-right { gap: 5px; }
+  .header-status-nav .status-tab { padding-inline: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .has-live-scores .live-score-strip-indicator span { animation: none; }
+}

@@ -12,6 +12,16 @@
   <body>
     <div class="app-shell">
       <header class="site-header">
+        <section class="live-score-strip" id="live-score-strip" aria-label="Today's football matches">
+          <div class="live-score-strip-heading">
+            <span class="live-score-strip-indicator" aria-hidden="true"><span></span></span>
+            <span>TODAY</span>
+            <span class="live-score-strip-count" id="live-score-strip-count" hidden></span>
+          </div>
+          <button class="live-score-strip-arrow" type="button" data-live-scroll="-1" aria-label="Scroll today's matches left" disabled>‹</button>
+          <div class="live-score-strip-track" id="live-score-strip-track" role="region" aria-label="Today's matches" tabindex="0">Loading today's matches…</div>
+          <button class="live-score-strip-arrow" type="button" data-live-scroll="1" aria-label="Scroll today's matches right" disabled>›</button>
+        </section>
         <div class="topbar">
           <a class="brand" href="#" aria-label="Touchline home">
             <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -21,6 +31,11 @@
             <button class="nav-link active" type="button" data-view="all">Scores</button>
           </nav>
           <div class="topbar-right">
+            <label class="search-box header-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"></circle><path d="m15.5 15.5 4 4"></path></svg>
+              <input id="match-search" type="search" placeholder="Search teams, leagues" autocomplete="off" aria-label="Search teams and leagues">
+              <kbd>/</kbd>
+            </label>
             <span class="feed-status loading" id="feed-status" title="Updating match scores"><span class="status-dot"></span><span id="feed-status-text">CONNECTING TO SCORES</span></span>
             <div class="theme-picker">
               <button class="icon-button theme-button" id="theme-button" type="button" aria-label="Choose color theme" aria-haspopup="menu" aria-expanded="false" aria-controls="theme-menu" title="Choose color theme">
@@ -37,16 +52,14 @@
             </div>
           </div>
         </div>
-        <section class="live-score-strip" id="live-score-strip" aria-label="Live football scores" hidden>
-          <div class="live-score-strip-heading">
-            <span class="live-score-strip-indicator" aria-hidden="true"><span></span></span>
-            <span>LIVE</span>
-            <span class="live-score-strip-count" id="live-score-strip-count">0</span>
-          </div>
-          <button class="live-score-strip-arrow" type="button" data-live-scroll="-1" aria-label="Scroll live scores left" disabled>‹</button>
-          <div class="live-score-strip-track" id="live-score-strip-track" role="region" aria-label="Live matches" tabindex="0"></div>
-          <button class="live-score-strip-arrow" type="button" data-live-scroll="1" aria-label="Scroll live scores right">›</button>
-        </section>
+        <nav class="header-status-nav status-tabs" role="tablist" aria-label="Filter matches by status">
+          <button class="status-tab active" type="button" role="tab" aria-selected="true" data-status="all">All <span id="all-status-count">—</span></button>
+          <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="live"><span class="tab-dot"></span>Live <span id="live-count">—</span></button>
+          <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="pre">Upcoming <span id="upcoming-count">—</span></button>
+          <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="post">Finished <span id="finished-count">—</span></button>
+          <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="favorites">Following <span id="favorites-count">—</span></button>
+          <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="broadcast">On TV <span id="broadcast-count">—</span></button>
+        </nav>
       </header>
 
       <main id="scores">
@@ -119,19 +132,6 @@
                   <p id="day-subtitle">Loading today's fixtures…</p>
                 </div>
                 <span class="match-total" id="match-total">— MATCHES</span>
-              </div>
-              <div class="status-tabs" role="tablist" aria-label="Filter matches by status">
-                <button class="status-tab active" type="button" role="tab" aria-selected="true" data-status="all">All <span id="all-status-count">—</span></button>
-                <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="live"><span class="tab-dot"></span>Live <span id="live-count">—</span></button>
-                <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="pre">Upcoming <span id="upcoming-count">—</span></button>
-                <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="post">Finished <span id="finished-count">—</span></button>
-                <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="favorites">Following <span id="favorites-count">—</span></button>
-                <button class="status-tab" type="button" role="tab" aria-selected="false" data-status="broadcast">On TV <span id="broadcast-count">—</span></button>
-                <label class="search-box">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"></circle><path d="m15.5 15.5 4 4"></path></svg>
-                  <input id="match-search" type="search" placeholder="Search teams, leagues" autocomplete="off" aria-label="Search teams and leagues">
-                  <kbd>/</kbd>
-                </label>
               </div>
               <div id="error-banner" class="error-banner" role="alert" hidden>
                 <span class="error-icon">!</span>
