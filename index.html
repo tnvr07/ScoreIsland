@@ -83,10 +83,13 @@
           <button class="date-step" type="button" data-day-step="-1" aria-label="Previous day">‹</button>
           <div class="date-strip" id="date-strip"></div>
           <button class="date-step" type="button" data-day-step="1" aria-label="Next day">›</button>
-          <label class="calendar-button" title="Choose any date" aria-label="Choose any match date">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M7.5 3v4M16.5 3v4M4 9.5h16"></path></svg>
-            <input id="date-picker" type="date" aria-label="Choose any date">
-          </label>
+          <div class="calendar-picker">
+            <button class="calendar-button" id="calendar-toggle" type="button" title="Choose any date"
+              aria-label="Choose any match date" aria-expanded="false" aria-controls="date-calendar">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M7.5 3v4M16.5 3v4M4 9.5h16"></path></svg>
+            </button>
+            <div class="calendar-popover" id="date-calendar" role="dialog" aria-label="Choose match date" hidden></div>
+          </div>
         </section>
 
         <section class="live-board" id="live-board" aria-label="Live matches">

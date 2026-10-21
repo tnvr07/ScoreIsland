@@ -34,7 +34,9 @@ const TEAM_COLORS = ["#d94b4b", "#3678bd", "#d9b53c", "#457a62", "#7850a3", "#c4
 const listElement = document.querySelector("#match-list");
 const competitionListElement = document.querySelector("#competition-list");
 const searchInput = document.querySelector("#match-search");
-const datePicker = document.querySelector("#date-picker");
+const calendarPicker = document.querySelector(".calendar-picker");
+const calendarToggle = document.querySelector("#calendar-toggle");
+const calendarPopover = document.querySelector("#date-calendar");
 const detailElement = document.querySelector("#detail-content");
 const detailEmptyElement = document.querySelector("#detail-empty");
 const matchCache = new Map();
@@ -98,6 +100,8 @@ function readRouteState() {
 
 const initialRouteState = readRouteState();
 selectedDate = initialRouteState.date;
+let calendarMonth = fromDateKey(selectedDate);
+let calendarFocusedDate = selectedDate;
 selectedMatchId = initialRouteState.match || null;
 activeStatus = initialRouteState.status;
 activeCompetition = initialRouteState.competition;
@@ -339,7 +343,89 @@ function renderDates() {
     dates.push(dateButtonMarkup(date, offset));
   }
   document.querySelector("#date-strip").innerHTML = dates.join("");
-  datePicker.value = selectedDate;
+  if (!calendarPopover.hidden) renderCalendar();
+}
+
+function renderCalendar() {
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const monthStart = new Date(year, month, 1);
+  const gridStart = new Date(year, month, 1 - monthStart.getDay());
+  const todayKey = toDateKey(new Date());
+  const monthLabel = new Intl.DateTimeFormat(undefined, { month: "long" }).format(monthStart);
+  const weekdays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(2023, 0, 1 + index);
+    return `<span role="columnheader">${new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date)}</span>`;
+  }).join("");
+  const years = Array.from({ length: 11 }, (_, index) => year - 5 + index);
+  const yearOptions = years.map((option) =>
+    `<option value="${option}"${option === year ? " selected" : ""}>${option}</option>`).join("");
+  const monthOptions = Array.from({ length: 12 }, (_, index) =>
+    `<option value="${index}"${index === month ? " selected" : ""}>${new Intl.DateTimeFormat(undefined, { month: "long" }).format(new Date(year, index, 1))}</option>`).join("");
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    const key = toDateKey(date);
+    const inMonth = date.getMonth() === month;
+    const classes = [
+      "calendar-day",
+      inMonth ? "" : "outside-month",
+      key === selectedDate ? "selected" : "",
+      key === todayKey ? "today" : "",
+    ].filter(Boolean).join(" ");
+    return `<button class="${classes}" type="button" role="gridcell" data-calendar-date="${key}" aria-label="${escapeHTML(date.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }))}" aria-selected="${key === selectedDate}"${key === todayKey ? ' aria-current="date"' : ""} tabindex="${key === calendarFocusedDate ? "0" : "-1"}">${date.getDate()}</button>`;
+  });
+  const weekRows = Array.from({ length: 6 }, (_, week) =>
+    `<div class="calendar-week-row" role="row">${days.slice(week * 7, week * 7 + 7).join("")}</div>`).join("");
+  calendarPopover.innerHTML = `
+    <div class="calendar-heading">
+      <div class="calendar-month-selectors">
+        <label><span class="visually-hidden">Month</span><select data-calendar-month aria-label="Month">${monthOptions}</select></label>
+        <label><span class="visually-hidden">Year</span><select data-calendar-year aria-label="Year">${yearOptions}</select></label>
+      </div>
+      <div class="calendar-month-nav">
+        <button type="button" data-calendar-action="previous" aria-label="Previous month">‹</button>
+        <button type="button" data-calendar-action="next" aria-label="Next month">›</button>
+      </div>
+    </div>
+    <div class="calendar-grid" role="grid" aria-label="${monthLabel} ${year}">
+      <div class="calendar-weekdays" role="row">${weekdays}</div>
+      ${weekRows}
+    </div>
+    <div class="calendar-footer">
+      <span>Selected: ${escapeHTML(fromDateKey(selectedDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }))}</span>
+      <button type="button" data-calendar-action="today">Today</button>
+    </div>`;
+}
+
+function openCalendar() {
+  calendarMonth = fromDateKey(selectedDate);
+  calendarFocusedDate = selectedDate;
+  renderCalendar();
+  calendarPopover.hidden = false;
+  calendarToggle.setAttribute("aria-expanded", "true");
+  calendarPopover.querySelector(`[data-calendar-date="${calendarFocusedDate}"]`)?.focus();
+}
+
+function closeCalendar(restoreFocus = false) {
+  calendarPopover.hidden = true;
+  calendarToggle.setAttribute("aria-expanded", "false");
+  if (restoreFocus) calendarToggle.focus();
+}
+
+function focusCalendarDate(date) {
+  calendarFocusedDate = toDateKey(date);
+  if (date.getMonth() !== calendarMonth.getMonth() || date.getFullYear() !== calendarMonth.getFullYear()) {
+    calendarMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    renderCalendar();
+  }
+  calendarPopover.querySelector(`[data-calendar-date="${calendarFocusedDate}"]`)?.focus();
+}
+
+function shiftCalendarDate(date, monthOffset) {
+  const targetMonth = new Date(date.getFullYear(), date.getMonth() + monthOffset, 1);
+  const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
+  return new Date(targetMonth.getFullYear(), targetMonth.getMonth(), Math.min(date.getDate(), lastDay));
 }
 
 function leagueLogoKey(leagueId, name) {
@@ -1545,14 +1631,80 @@ document.querySelector("#date-strip").addEventListener("click", (event) => {
 
 document.querySelector(".date-strip-wrap").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-day-step]");
-  if (!button) return;
-  const date = fromDateKey(selectedDate);
-  date.setDate(date.getDate() + Number(button.dataset.dayStep));
-  changeDate(toDateKey(date));
+  if (button) {
+    const date = fromDateKey(selectedDate);
+    date.setDate(date.getDate() + Number(button.dataset.dayStep));
+    changeDate(toDateKey(date));
+  }
 });
 
-datePicker.addEventListener("change", () => {
-  changeDate(datePicker.value);
+calendarPicker.addEventListener("click", (event) => {
+  const actionButton = event.target.closest("[data-calendar-action]");
+  if (event.target.closest("#calendar-toggle")) {
+    if (calendarPopover.hidden) openCalendar();
+    else closeCalendar();
+    return;
+  }
+  if (!actionButton) {
+    const dayButton = event.target.closest("[data-calendar-date]");
+    if (!dayButton) return;
+    const date = dayButton.dataset.calendarDate;
+    closeCalendar(true);
+    changeDate(date);
+    return;
+  }
+  const action = actionButton.dataset.calendarAction;
+  if (action === "today") {
+    const today = toDateKey(new Date());
+    closeCalendar(true);
+    changeDate(today);
+    return;
+  }
+  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + (action === "next" ? 1 : -1), 1);
+  calendarFocusedDate = toDateKey(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1));
+  renderCalendar();
+});
+
+calendarPicker.addEventListener("change", (event) => {
+  if (!event.target.matches("[data-calendar-month], [data-calendar-year]")) return;
+  const month = Number(calendarPopover.querySelector("[data-calendar-month]").value);
+  const year = Number(calendarPopover.querySelector("[data-calendar-year]").value);
+  calendarMonth = new Date(year, month, 1);
+  const selected = fromDateKey(calendarFocusedDate);
+  if (selected.getMonth() !== month || selected.getFullYear() !== year) {
+    calendarFocusedDate = toDateKey(calendarMonth);
+  }
+  renderCalendar();
+  calendarPopover.querySelector(`[data-calendar-date="${calendarFocusedDate}"]`)?.focus();
+});
+
+calendarPopover.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeCalendar(true);
+    return;
+  }
+  const dayButton = event.target.closest("[data-calendar-date]");
+  if (!dayButton) return;
+  const date = fromDateKey(dayButton.dataset.calendarDate);
+  const dayOffsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+  if (dayOffsets[event.key]) {
+    event.preventDefault();
+    date.setDate(date.getDate() + dayOffsets[event.key]);
+    focusCalendarDate(date);
+  } else if (event.key === "PageUp" || event.key === "PageDown") {
+    event.preventDefault();
+    focusCalendarDate(shiftCalendarDate(date, event.key === "PageDown" ? 1 : -1));
+  } else if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    date.setDate(date.getDate() + (event.key === "Home" ? -date.getDay() : 6 - date.getDay()));
+    focusCalendarDate(date);
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (!calendarPicker.contains(event.target)) closeCalendar();
 });
 
 document.querySelectorAll("[data-status]").forEach((button) => {
@@ -1738,6 +1890,14 @@ window.addEventListener("resize", () => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (!calendarPopover.hidden) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeCalendar(true);
+      return;
+    }
+    if (calendarPopover.contains(event.target)) return;
+  }
   const typing = event.target instanceof HTMLElement
     && (event.target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName));
   if (!typing && themeMenu.hidden && !event.metaKey && !event.ctrlKey && !event.altKey) {
@@ -1781,7 +1941,7 @@ document.addEventListener("keydown", (event) => {
       themeOptions[nextIndex].focus();
     }
   }
-  if (document.body.classList.contains("detail-open") && event.key === "Tab") {
+  if (document.body.classList.contains("detail-open") && calendarPopover.hidden && event.key === "Tab") {
     const panel = document.querySelector("#match-panel");
     const focusable = [...panel.querySelectorAll('button:not([disabled]), a[href], input:not([disabled])')];
     const first = focusable[0];
