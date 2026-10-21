@@ -448,7 +448,22 @@ function leagueLogoUrl(leagueId, name) {
   if (isChampionsLeague(leagueId, name)) {
     return "assets/champions-league-starball.png";
   }
+  const id = String(leagueId);
+  const league = `${id} ${name ?? ""}`.toLocaleLowerCase();
+  if (id === "700" || /premier league/.test(league)) return "assets/premier-league-white.png";
+  if (id === "740" || /la\s?liga/.test(league)) return "assets/laliga-white.png";
+  if (id === "766" || /uefa europa league/.test(league)) return "assets/europa-league.png";
+  if (id === "768" || /uefa conference league/.test(league)) return "assets/conference-league-white.png";
   return leagueLogoCache.get(leagueLogoKey(leagueId, name)) || "";
+}
+
+function leagueLogoClass(leagueId, name) {
+  const logo = leagueLogoUrl(leagueId, name);
+  if (logo.includes("premier-league-white")) return "league-logo-premier";
+  if (logo.includes("laliga-white")) return "league-logo-laliga";
+  if (logo.includes("europa-league.png")) return "league-logo-europa";
+  if (logo.includes("conference-league-white")) return "league-logo-conference";
+  return "";
 }
 
 function rememberLeagueLogo(match, detail) {
@@ -461,7 +476,7 @@ function rememberLeagueLogo(match, detail) {
 function leagueBadgeMarkup(name, leagueId = "") {
   const url = leagueLogoUrl(leagueId, name);
   return url
-    ? `<span class="league-logo league-logo-image" aria-hidden="true"><img src="${escapeHTML(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true; this.nextElementSibling.hidden=false;"><span class="league-logo-fallback" hidden>${competitionIcon(name)}</span></span>`
+    ? `<span class="league-logo league-logo-image ${leagueLogoClass(leagueId, name)}" aria-hidden="true"><img src="${escapeHTML(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true; this.nextElementSibling.hidden=false;"><span class="league-logo-fallback" hidden>${competitionIcon(name)}</span></span>`
     : `<span class="league-logo league-logo-text" aria-hidden="true">${competitionIcon(name)}</span>`;
 }
 

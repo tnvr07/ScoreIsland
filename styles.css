@@ -2401,6 +2401,24 @@ body.neon-theme .detail-scoreboard .detail-team-badge:has(img) {
 .competition-list .competition-option-label,
 .competition-list .competition-count { font-size: 11px; }
 .competition-count { flex: none; }
+.competition-option .league-logo-premier,
+.competition-option .league-logo-laliga,
+.competition-option .league-logo-conference {
+  padding: 4px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 7px;
+  background: linear-gradient(145deg,#26324b,#171d31);
+}
+.competition-option .league-logo-europa {
+  padding: 2px;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 7px;
+  background: #f5f4f1;
+}
+.competition-option .league-logo-premier img,
+.competition-option .league-logo-laliga img,
+.competition-option .league-logo-conference img,
+.competition-option .league-logo-europa img { filter: none; }
 .sidebar-divider { margin: 12px 4px 9px; }
 .sidebar-note { padding: 4px 5px 3px; }
 
