@@ -39,6 +39,9 @@ const detailElement = document.querySelector("#detail-content");
 const detailEmptyElement = document.querySelector("#detail-empty");
 const matchCache = new Map();
 const detailCache = new Map();
+const matchSummaryRequests = new Map();
+const leagueLogoCache = new Map();
+const leagueLogoAttempted = new Set();
 const currentDate = new Date();
 const competitionSearchInput = document.querySelector("#competition-search");
 let selectedDate;
@@ -339,12 +342,43 @@ function renderDates() {
   datePicker.value = selectedDate;
 }
 
+function leagueLogoKey(leagueId, name) {
+  return String(leagueId || name || "");
+}
+
+function leagueLogoFromDetail(detail) {
+  return detail?.header?.league?.logos?.find((logo) =>
+    logo.href?.startsWith("https://")
+      && /\/leaguelogos\/soccer\/500\//.test(logo.href)
+      && !/\/500-dark\//.test(logo.href)
+  )?.href || "";
+}
+
+function leagueLogoUrl(leagueId, name) {
+  return leagueLogoCache.get(leagueLogoKey(leagueId, name)) || "";
+}
+
+function rememberLeagueLogo(match, detail) {
+  const logo = leagueLogoFromDetail(detail);
+  if (!logo) return false;
+  leagueLogoCache.set(leagueLogoKey(match.leagueId, match.league), logo);
+  return true;
+}
+
+function leagueBadgeMarkup(name, leagueId = "") {
+  const url = leagueLogoUrl(leagueId, name);
+  return url
+    ? `<span class="league-logo league-logo-image" aria-hidden="true"><img src="${escapeHTML(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true; this.nextElementSibling.hidden=false;"><span class="league-logo-fallback" hidden>${competitionIcon(name)}</span></span>`
+    : `<span class="league-logo league-logo-text" aria-hidden="true">${competitionIcon(name)}</span>`;
+}
+
 function renderCompetitionFilters() {
   const groups = new Map();
   for (const match of matches) {
-    const existing = groups.get(match.league) ?? { count: 0, live: 0 };
+    const existing = groups.get(match.league) ?? { count: 0, live: 0, leagueId: match.leagueId || "" };
     existing.count += 1;
     if (match.state === "in") existing.live += 1;
+    if (!existing.leagueId) existing.leagueId = match.leagueId || "";
     groups.set(match.league, existing);
   }
   const options = [...groups.entries()]
@@ -352,7 +386,7 @@ function renderCompetitionFilters() {
     .sort((a, b) => compareCompetitionPriority(a[0], b[0]) || a[0].localeCompare(b[0]));
   const renderOption = ([name, info]) => `
     <button class="competition-option${activeCompetition === name ? " selected" : ""}" type="button" data-competition="${escapeHTML(name)}" aria-pressed="${activeCompetition === name}">
-      <span class="competition-icon" aria-hidden="true">${competitionIcon(name)}</span>
+      ${leagueBadgeMarkup(name, info.leagueId)}
       <span class="competition-option-label">${escapeHTML(name)}${info.live ? '<span class="competition-live-dot"></span>' : ""}</span>
       <span class="competition-count">${info.count}</span>
     </button>`;
@@ -652,17 +686,20 @@ function renderMatches() {
   </section>` : "";
   listElement.innerHTML = followingMarkup + [...groups.entries()]
     .sort((a, b) => compareCompetitionPriority(a[0], b[0]) || a[0].localeCompare(b[0]))
-    .map(([league, leagueMatches]) => `
-    <section class="league-group">
-      <button class="league-heading" type="button" data-league="${escapeHTML(league)}" aria-label="Filter by ${escapeHTML(league)}">
-        <span class="league-mark">${competitionIcon(league)}</span>
-        <span class="league-title">${highlightedText(league)}${leagueMatches[0].stage ? `<small>${highlightedText(leagueMatches[0].stage)}</small>` : ""}</span>
-        <span class="league-count">${leagueMatches.length}</span>
-        <span class="league-chevron" aria-hidden="true">⌄</span>
-      </button>
-      <div class="league-matches">${leagueMatches.map(renderMatch).join("")}</div>
-    </section>
-  `).join("");
+    .map(([league, leagueMatches]) => {
+      const leagueMatch = leagueMatches[0];
+      return `
+      <section class="league-group">
+        <button class="league-heading" type="button" data-league="${escapeHTML(league)}" aria-label="Filter by ${escapeHTML(league)}">
+          ${leagueBadgeMarkup(league, leagueMatch?.leagueId || "")}
+          <span class="league-title">${highlightedText(league)}${leagueMatch?.stage ? `<small>${highlightedText(leagueMatch.stage)}</small>` : ""}</span>
+          <span class="league-count">${leagueMatches.length}</span>
+          <span class="league-chevron" aria-hidden="true">⌄</span>
+        </button>
+        <div class="league-matches">${leagueMatches.map(renderMatch).join("")}</div>
+      </section>
+    `;
+    }).join("");
   const empty = filtered.length === 0;
   document.querySelector("#empty-state").hidden = !empty;
   document.querySelector("#match-list").hidden = empty;
@@ -799,6 +836,7 @@ async function loadMatches({ force = false } = {}) {
     document.querySelector("#error-banner").hidden = true;
     lastSuccessfulFetchAt = Date.now();
     renderMatches();
+    void preloadLeagueLogos();
     renderUpdatedTime();
     if (!selectedMatchId && !hasAutoSelectedMatch && window.matchMedia("(min-width: 721px)").matches) {
       const defaultMatch = selectDefaultMatch();
@@ -1277,9 +1315,7 @@ function detailMetadataMarkup(match, detail) {
   const timeLabel = validDate
     ? new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date)
     : "Time TBC";
-  const leagueLogo = detail?.header?.league?.logos?.find((logo) =>
-    logo.href?.startsWith("https://")
-  )?.href;
+  const leagueLogo = leagueLogoFromDetail(detail) || leagueLogoUrl(match.leagueId, match.league);
   const broadcasts = detailBroadcastNames(match, detail, competition);
   const broadcastLabel = broadcasts.length
     ? `${broadcasts.slice(0, 2).join(", ")}${broadcasts.length > 2 ? ` +${broadcasts.length - 2}` : ""}`
@@ -1349,14 +1385,62 @@ function renderDetail() {
   if (!wasOpen && modal) panel.querySelector(".detail-close").focus();
 }
 
-async function loadMatchDetails(match) {
-  if (detailCache.has(match.id)) return;
-  try {
+async function fetchMatchSummary(match) {
+  if (detailCache.has(match.id)) return detailCache.get(match.id);
+  const pendingRequest = matchSummaryRequests.get(match.id);
+  if (pendingRequest) return pendingRequest;
+
+  const request = (async () => {
     const response = await fetch(`${API_BASE}/summary?event=${encodeURIComponent(match.id)}`);
     if (!response.ok) throw new Error(`Match details returned HTTP ${response.status}.`);
     const detail = await response.json();
     detailCache.set(match.id, detail);
+    return detail;
+  })();
+  matchSummaryRequests.set(match.id, request);
+  try {
+    return await request;
+  } finally {
+    matchSummaryRequests.delete(match.id);
+  }
+}
+
+async function preloadLeagueLogos() {
+  const competitions = new Map();
+  for (const match of [...matches, ...liveScoreMatches]) {
+    const key = leagueLogoKey(match.leagueId, match.league);
+    if (!leagueLogoCache.has(key) && !leagueLogoAttempted.has(key)) {
+      leagueLogoAttempted.add(key);
+      if (!competitions.has(key)) competitions.set(key, match);
+    }
+  }
+  const pending = [...competitions.values()];
+  if (!pending.length) return;
+
+  let nextIndex = 0;
+  let logosChanged = false;
+  await Promise.all(Array.from({ length: Math.min(4, pending.length) }, async () => {
+    while (nextIndex < pending.length) {
+      const match = pending[nextIndex];
+      nextIndex += 1;
+      try {
+        const detail = await fetchMatchSummary(match);
+        if (rememberLeagueLogo(match, detail)) logosChanged = true;
+      } catch (error) {
+        console.error(`Unable to load the ${match.league} logo.`, error);
+      }
+    }
+  }));
+  if (logosChanged) renderMatches();
+}
+
+async function loadMatchDetails(match) {
+  if (detailCache.has(match.id)) return;
+  try {
+    const detail = await fetchMatchSummary(match);
+    const logoChanged = rememberLeagueLogo(match, detail);
     renderLiveBoard();
+    if (logoChanged) renderMatches();
     if (selectedMatchId === match.id) renderDetail();
   } catch (error) {
     console.error(`Unable to load match details for ${match.id}.`, error);

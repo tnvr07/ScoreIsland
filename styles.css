@@ -126,6 +126,11 @@ h1 span { color: #81877c; }
 .competition-option:hover { background: var(--panel-3); color: var(--text); }
 .competition-option.selected { border-color: #333832; background: #232622; color: var(--text); }
 .competition-icon { width: 18px; height: 18px; flex: none; display: grid; place-items: center; border: 1px solid #353a34; border-radius: 5px; background: #222522; color: #c1cbb4; font-size: 9px; font-weight: 700; }
+.league-logo { flex: none; display: grid; place-items: center; overflow: hidden; }
+.league-logo img { width: 100%; height: 100%; display: block; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,.28)); }
+.league-logo-fallback, .league-logo-text { width: 100%; height: 100%; display: grid; place-items: center; color: var(--lime); font-size: 16px; font-weight: 700; }
+.competition-option .league-logo { width: 30px; height: 30px; }
+.league-heading .league-logo { width: 36px; height: 36px; }
 .all-icon { color: var(--lime); }
 .competition-option-label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 500; }
 .competition-count { color: var(--faint); font: 9px var(--mono); }
@@ -161,7 +166,7 @@ kbd { padding: 1px 4px; border: 1px solid #383c38; border-radius: 3px; color: va
 .league-group + .league-group { border-top: 1px solid var(--border-soft); }
 .league-heading { width: 100%; min-height: 42px; padding: 8px 13px; display: flex; align-items: center; gap: 8px; border: 0; background: rgba(255,255,255,.012); text-align: left; cursor: pointer; }
 .league-heading:hover { background: rgba(255,255,255,.035); }
-.league-mark { width: 19px; height: 19px; flex: none; display: grid; place-items: center; border: 1px solid #343834; border-radius: 5px; background: #20231f; color: var(--lime); font-size: 9px; font-weight: 700; }
+.league-mark { width: 19px; height: 19px; flex: none; display: grid; place-items: center; border: 1px solid #343834; border-radius: 5px; background: #20231f; color: var(--lime); font-size: 9px; font-weight: 700; overflow: hidden; }
 .league-title { min-width: 0; flex: 1; color: #d7dbd3; font-size: 10px; font-weight: 700; }
 .league-title small { display: block; margin-top: 2px; color: var(--faint); font-size: 8px; font-weight: 400; }
 .league-count { min-width: 19px; height: 19px; display: grid; place-items: center; border: 1px solid #353935; border-radius: 50%; color: var(--muted); font: 9px var(--mono); }
