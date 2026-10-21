@@ -23,6 +23,7 @@ The feed covers many competitions around the world, but it does not guarantee ev
 - Browse dates, search fixtures, and filter by match status or competition.
 - Follow every live match in the horizontally scrollable header score strip; it stays current when browsing another date and opens each match centre.
 - Choose between Aurora, Neon, and Daylight color themes; your selection is saved in the browser.
+- Browse a refreshed, responsive match-day interface with clearer score hierarchy, competition filters, live highlights, and match-centre layouts.
 - Find fixtures with broadcast information listed in the feed; broadcast availability is region-dependent.
 - Follow matches; favorites persist in the browser.
 - Open a full match centre with kickoff, competition, venue and broadcast metadata; the scoreboard, reported goal scorers, all/key-event commentary filters, an ESPN-coordinate shot map when event locations are available, statistics, formation-pitch line-ups and substitutes, and standings.

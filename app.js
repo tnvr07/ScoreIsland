@@ -119,7 +119,7 @@ function savedTheme() {
 function applyTheme(theme) {
   document.body.classList.toggle("light-theme", theme === "light");
   document.body.classList.toggle("neon-theme", theme === "neon");
-  document.querySelector('meta[name="theme-color"]').content = theme === "light" ? "#f4f1e9" : theme === "neon" ? "#10102f" : "#062e32";
+  document.querySelector('meta[name="theme-color"]').content = theme === "light" ? "#f1f5f1" : theme === "neon" ? "#100f22" : "#071117";
   themeButton.querySelector(".theme-current").textContent = THEME_NAMES[theme];
   themeButton.setAttribute("aria-label", `Color theme: ${THEME_NAMES[theme]}`);
   themeButton.title = `Color theme: ${THEME_NAMES[theme]}`;
