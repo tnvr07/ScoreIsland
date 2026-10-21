@@ -477,14 +477,25 @@ function renderCompetitionFilters() {
   const options = [...groups.entries()]
     .filter(([name]) => !competitionSearchTerm || name.toLocaleLowerCase().includes(competitionSearchTerm))
     .sort((a, b) => compareCompetitionPriority(a[0], b[0]) || a[0].localeCompare(b[0]));
+  const pinnedLeagues = [
+    ["Premier League", "700", /premier league/i],
+    ["LaLiga", "740", /la\s?liga/i],
+  ];
+  for (const [name, leagueId, alias] of pinnedLeagues) {
+    if ((!competitionSearchTerm || name.toLocaleLowerCase().includes(competitionSearchTerm))
+      && !options.some(([competition]) => alias.test(competition))) {
+      options.push([name, { count: 0, live: 0, leagueId }]);
+    }
+  }
+  options.sort((a, b) => compareCompetitionPriority(a[0], b[0]) || a[0].localeCompare(b[0]));
   const renderOption = ([name, info]) => `
     <button class="competition-option${activeCompetition === name ? " selected" : ""}" type="button" data-competition="${escapeHTML(name)}" aria-pressed="${activeCompetition === name}">
       ${leagueBadgeMarkup(name, info.leagueId)}
       <span class="competition-option-label">${escapeHTML(name)}${info.live ? '<span class="competition-live-dot"></span>' : ""}</span>
       <span class="competition-count">${info.count}</span>
     </button>`;
-  const topLeagues = options.filter(([name]) => TOP_COMPETITIONS.includes(name));
-  const otherLeagues = options.filter(([name]) => !TOP_COMPETITIONS.includes(name));
+  const topLeagues = options.filter(([name]) => competitionPriority(name) < TOP_COMPETITIONS.length);
+  const otherLeagues = options.filter(([name]) => competitionPriority(name) >= TOP_COMPETITIONS.length);
   competitionListElement.innerHTML = `${topLeagues.length ? `<div class="competition-group-label">TOP LEAGUES</div>${topLeagues.map(renderOption).join("")}` : ""}
     ${otherLeagues.length ? `<div class="competition-group-label">MORE COMPETITIONS</div>${otherLeagues.map(renderOption).join("")}` : ""}
     ${options.length ? "" : '<p class="competition-search-empty">No competitions found.</p>'}`;
@@ -631,12 +642,23 @@ function visibleMatches() {
 
 function compareCompetitionPriority(first, second) {
   const nameOf = (value) => typeof value === "string" ? value : value.league;
-  const priority = (value) => {
-    const name = nameOf(value);
-    const index = TOP_COMPETITIONS.findIndex((competition) => competition.toLocaleLowerCase() === name?.toLocaleLowerCase());
-    return index < 0 ? TOP_COMPETITIONS.length : index;
-  };
-  return priority(first) - priority(second);
+  return competitionPriority(nameOf(first)) - competitionPriority(nameOf(second));
+}
+
+function competitionPriority(name) {
+  const normalized = name?.toLocaleLowerCase() ?? "";
+  const aliases = [
+    /premier league/,
+    /^uefa champions league$/,
+    /la\s?liga/,
+    /^serie a$/,
+    /^bundesliga$/,
+    /^ligue 1$/,
+    /^uefa europa league$/,
+    /^uefa conference league$/,
+  ];
+  const index = aliases.findIndex((alias) => alias.test(normalized));
+  return index < 0 ? TOP_COMPETITIONS.length : index;
 }
 
 function renderMatch(match) {
