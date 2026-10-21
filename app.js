@@ -470,7 +470,7 @@ function matchClock(match) {
 
 function scoreMarkup(match) {
   if (match.state === "pre") {
-    return '<span class="score upcoming-score">VS</span>';
+    return '<span class="score upcoming-score"><img class="versus-mark" src="assets/touchline-match-mark.png" alt=""></span>';
   }
   return `<span class="score${flashedMatchIds.has(match.id) ? " score-updated" : ""}" data-score-match="${escapeHTML(match.id)}" aria-label="${escapeHTML(`${match.home.name} ${match.home.score ?? "0"}, ${match.away.name} ${match.away.score ?? "0"}`)}">
     <span class="${match.home.winner ? "winner" : match.away.winner ? "loser" : ""}">${escapeHTML(match.home.score ?? "0")}</span>
@@ -631,7 +631,6 @@ function renderLiveBoard() {
 }
 
 function renderLiveScoreStrip() {
-  const strip = document.querySelector("#live-score-strip");
   const track = document.querySelector("#live-score-strip-track");
   const count = document.querySelector("#live-score-strip-count");
   const matchesToday = [...liveScoreMatches].sort((a, b) => {
@@ -646,7 +645,7 @@ function renderLiveScoreStrip() {
   count.hidden = liveCount === 0;
   track.setAttribute("aria-label", `Today's matches${liveCount ? `, ${liveCount} live` : ""}`);
   if (!matchesToday.length) {
-    track.innerHTML = `<span class="live-score-strip-empty">${liveScoreMatches.length === 0 ? "No matches scheduled today" : "Loading today's matches…"}</span>`;
+    track.innerHTML = `<span class="live-score-strip-empty">No matches scheduled today</span>`;
     updateLiveScoreArrows();
     return;
   }
@@ -665,7 +664,7 @@ function renderLiveScoreStrip() {
         ? match.status === "Final" ? "FT" : match.status
         : timeLabel(match.date);
     const score = match.state === "pre"
-      ? `<span class="live-score-item-upcoming">VS</span>`
+      ? `<span class="live-score-item-upcoming"><img class="versus-mark" src="assets/touchline-match-mark.png" alt=""></span>`
       : `<strong class="live-score-item-score">${escapeHTML(match.home.score ?? "0")}<span>–</span>${escapeHTML(match.away.score ?? "0")}</strong>`;
     const accessibleScore = match.state === "pre"
       ? `kickoff ${matchStatus}`

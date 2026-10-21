@@ -192,6 +192,7 @@ kbd { padding: 1px 4px; border: 1px solid #383c38; border-radius: 3px; color: va
 .score-separator { margin: 0 4px; color: #62675f; font-weight: 400; }
 .score .winner { color: var(--lime); }
 .upcoming-score { color: var(--faint); font: 500 10px var(--mono); letter-spacing: .07em; }
+.versus-mark { width: 30px; height: 28px; display: block; object-fit: contain; }
 .match-clock { min-height: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; color: var(--muted); font: 9px var(--mono); text-align: center; white-space: nowrap; }
 .live-clock { color: var(--green); }
 .finished-clock { color: var(--faint); }
@@ -2004,7 +2005,8 @@ body.detail-open:not(.detail-modal-open) .shot-map-heading h3 { font-size: 15px;
 }
 
 /* Match-centre inspired header: today's fixtures, brand controls, then match filters. */
-:root { --header-sticky-offset: 218px; }
+:root { --header-sticky-offset: 221px; }
+body.has-live-scores { --header-sticky-offset: 221px; }
 .site-header { display: flex; flex-direction: column; }
 .topbar { order: 2; }
 .live-score-strip { order: 1; }
@@ -2040,7 +2042,7 @@ body.detail-open:not(.detail-modal-open) .shot-map-heading h3 { font-size: 15px;
 }
 .header-status-nav .status-tab.active > span:not(.tab-dot) { color: var(--lime); }
 .header-status-nav .status-tab:disabled { opacity: .48; cursor: default; }
-.header-search { width: clamp(190px, 18vw, 250px); max-width: none; margin-left: 0; }
+.header-search { width: clamp(190px, 18vw, 250px); max-width: none; margin-left: 0; flex: 0 1 250px; }
 .topbar-right { gap: 12px; }
 .live-score-strip-heading { min-width: 78px; }
 .live-score-strip-count { font: 700 9px var(--sans); letter-spacing: 0; }
@@ -2060,7 +2062,8 @@ body.detail-open:not(.detail-modal-open) .shot-map-heading h3 { font-size: 15px;
 .live-score-item.in .live-score-item-clock { color: var(--red); }
 .live-score-item.in .live-score-item-clock .clock-dot { display: block; background: var(--red); box-shadow: 0 0 7px rgba(255,115,125,.5); }
 .live-score-item.pre .live-score-item-clock { color: var(--green); }
-.live-score-item-upcoming { color: var(--faint); font: 700 11px var(--mono); }
+.live-score-item-upcoming { display: grid; place-items: center; }
+.live-score-item-upcoming .versus-mark { width: 17px; height: 15px; }
 .live-score-item-match { gap: 9px; }
 .live-score-item-team { font-size: 11px; }
 .live-score-item-score { font-size: 14px; }
@@ -2071,12 +2074,13 @@ body.light-theme .header-status-nav .status-tab.active { background: transparent
   .header-search { width: clamp(160px, 24vw, 220px); }
 }
 @media (max-width: 720px) {
-  :root { --header-sticky-offset: 180px; }
+  :root { --header-sticky-offset: 183px; }
+  body.has-live-scores { --header-sticky-offset: 183px; }
   .site-header, .live-score-strip { padding-inline: 14px; }
   .topbar { height: 62px; gap: 8px; }
   .main-nav { display: none; }
   .topbar-right { gap: 8px; margin-left: auto; }
-  .header-search { width: clamp(130px, 43vw, 210px); min-width: 0; height: 36px; padding-inline: 8px; }
+  .header-search { width: clamp(130px, 43vw, 210px); min-width: 0; height: 36px; padding-inline: 8px; flex: 0 1 clamp(130px, 43vw, 210px); }
   .header-search kbd { display: none; }
   .theme-button { width: 38px; height: 38px; padding: 0; }
   .theme-current, .theme-chevron { display: none; }
@@ -2092,7 +2096,8 @@ body.light-theme .header-status-nav .status-tab.active { background: transparent
   .header-status-nav .status-tab.active::after { right: 9px; left: 9px; }
 }
 @media (max-width: 390px) {
-  :root { --header-sticky-offset: 176px; }
+  :root { --header-sticky-offset: 183px; }
+  body.has-live-scores { --header-sticky-offset: 183px; }
   .site-header, .live-score-strip { padding-inline: 10px; }
   .header-search { width: clamp(118px, 40vw, 150px); }
   .topbar-right { gap: 5px; }
@@ -2100,4 +2105,25 @@ body.light-theme .header-status-nav .status-tab.active { background: transparent
 }
 @media (prefers-reduced-motion: reduce) {
   .has-live-scores .live-score-strip-indicator span { animation: none; }
+}
+
+.match-row .team-badge {
+  width: 46px;
+  height: 46px;
+  flex-basis: 46px;
+}
+.match-row .team-badge img {
+  width: 40px;
+  height: 40px;
+}
+@media (max-width: 720px) {
+  .match-row .team-badge {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+  .match-row .team-badge img {
+    width: 34px;
+    height: 34px;
+  }
 }
