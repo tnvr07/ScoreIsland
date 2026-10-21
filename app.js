@@ -1525,7 +1525,7 @@ function renderDetail() {
     ${detail && !detail.error
       ? detailMomentum(match, detail)
       : !detail
-        ? '<section class="momentum-card momentum-loading" aria-label="Loading match momentum"><div class="momentum-heading"><div><span class="momentum-kicker">MATCH FLOW</span><h3>Match momentum</h3></div></div><div class="momentum-loading-state"><span class="loading-spinner" aria-hidden="true"></span>Loading reported match events…</div></section>'
+        ? '<section class="momentum-card momentum-loading" aria-label="Loading match momentum"><div class="momentum-heading"><div><span class="momentum-kicker">MATCH FLOW</span><h3>Match momentum</h3></div></div><div class="momentum-loading-state" role="status"><span class="loading-spinner" aria-hidden="true"></span><span>Loading reported match events…</span></div></section>'
         : ""}
     <div class="detail-tabs" role="tablist" aria-label="Match details">
       ${["overview", "statistics", "lineups", "standings", "h2h"].map((tab) => `<button class="detail-tab${selectedDetailTab === tab ? " active" : ""}" type="button" role="tab" aria-selected="${selectedDetailTab === tab}" data-detail-tab="${tab}">${tab === "overview" ? "Overview" : tab === "statistics" ? "Stats" : tab === "lineups" ? "Line-ups" : tab === "standings" ? "Table" : "H2H"}</button>`).join("")}
