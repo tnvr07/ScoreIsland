@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@import url("https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,800,900&f[]=clash-grotesk@400,500,600,700&display=swap");
 
 :root {
   color-scheme: dark;
@@ -14,8 +14,8 @@
   --green: #5de0b1;
   --lime: #c8ed70;
   --red: #ff7373;
-  --sans: "Josefin Sans", "Segoe UI", sans-serif;
-  --mono: "Josefin Sans", "Segoe UI", sans-serif;
+  --sans: "Satoshi", "Satoshi Fallback", "Segoe UI", sans-serif;
+  --mono: "Satoshi", "Satoshi Fallback", "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -1506,12 +1506,12 @@ body.light-theme .live-card-event { color: #586f70; }
 body.light-theme .live-board-link { border-color: #c4d2c7; background: rgba(255,255,255,.35); color: #34594f; }
 
 /* Keep the refreshed layout above older legacy overrides. */
-:root { --page:#071117; --panel:#0c1921; --panel-2:#11232c; --panel-3:#172d36; --border:#28404a; --border-soft:rgba(177,211,210,.12); --text:#f0f6f3; --muted:#a1b5b4; --faint:#718987; --green:#76e0b2; --lime:#d5f36a; --red:#ff737d; --sans:"DM Sans","Segoe UI",sans-serif; --mono:"DM Mono","Cascadia Code",monospace; }
+:root { --page:#071117; --panel:#0c1921; --panel-2:#11232c; --panel-3:#172d36; --border:#28404a; --border-soft:rgba(177,211,210,.12); --text:#f0f6f3; --muted:#a1b5b4; --faint:#718987; --green:#76e0b2; --lime:#d5f36a; --red:#ff737d; --sans:"Satoshi","Satoshi Fallback","Segoe UI",sans-serif; --mono:"Satoshi","Satoshi Fallback","Segoe UI",sans-serif; }
 body { background:radial-gradient(ellipse at 12% 4%,rgba(33,105,90,.2),transparent 28rem),radial-gradient(ellipse at 93% 22%,rgba(40,74,94,.2),transparent 34rem),linear-gradient(180deg,#08151c 0%,#071117 48rem,#09151b 100%); font-size:14px; }
 .app-shell { max-width:1680px; padding-inline:clamp(20px,3.2vw,52px); }
 .site-header { padding-inline:max(clamp(20px,3.2vw,52px),calc((100vw - 1576px) / 2)); border-bottom:1px solid rgba(177,211,210,.09); background:rgba(7,17,23,.88); backdrop-filter:blur(24px) saturate(140%); }
 .topbar { height:78px; border-color:rgba(177,211,210,.1); }
-.brand { gap:11px; font-family:"Space Grotesk",var(--sans); font-size:21px; }
+.brand { gap:11px; font-family:"Clash Grotesk","Satoshi","Segoe UI",sans-serif; font-size:21px; }
 .brand-mark { width:31px; height:31px; border-color:rgba(213,243,106,.32); border-radius:10px; background:rgba(213,243,106,.08); }
 .main-nav { gap:32px; }
 .nav-link { font-size:13px; }
@@ -1521,7 +1521,7 @@ body { background:radial-gradient(ellipse at 12% 4%,rgba(33,105,90,.2),transpare
 main { padding-top:36px; }
 .page-heading { min-height:148px; }
 .eyebrow { margin-bottom:13px; font-size:10px; letter-spacing:.16em; }
-h1 { font-family:"Space Grotesk",var(--sans); font-size:clamp(40px,4.3vw,58px); letter-spacing:-2.8px; }
+h1 { font-family:"Clash Grotesk","Satoshi","Segoe UI",sans-serif; font-size:clamp(40px,4.3vw,58px); letter-spacing:-2.8px; }
 h1 span { color:#8a9b97; }
 .page-description { margin-top:14px; font-size:14px; }
 .refresh-button { height:42px; padding-inline:15px; border-radius:11px; font-size:12px; }
@@ -1535,7 +1535,7 @@ h1 span { color:#8a9b97; }
 .live-board { margin-bottom:24px; padding:21px 22px 22px; border-color:rgba(118,224,178,.2); border-radius:18px; background:radial-gradient(ellipse at 88% 0%,rgba(118,224,178,.12),transparent 40%),linear-gradient(120deg,#102a2c,#10232d 55%,#10212b); }
 .live-board-heading { min-height:46px; margin-bottom:16px; }
 .live-pulse { width:32px; height:32px; }
-.live-board-title h2 { font-family:"Space Grotesk",var(--sans); font-size:19px; }
+.live-board-title h2 { font-family:"Clash Grotesk","Satoshi","Segoe UI",sans-serif; font-size:19px; }
 .live-card { min-height:122px; padding:14px 15px 12px; border-radius:14px; background:linear-gradient(145deg,rgba(21,45,53,.9),rgba(10,28,36,.92)); }
 .live-card-team { font-size:12px; }
 .live-card-score { font-size:22px; }
@@ -1547,7 +1547,7 @@ h1 span { color:#8a9b97; }
 .competition-option.selected { border-color:rgba(213,243,106,.22); background:rgba(213,243,106,.1); }
 .competition-icon, .league-mark { border-radius:9px; }
 .scores-card-heading { min-height:82px; padding:18px 20px; }
-.scores-card-heading h2 { font-family:"Space Grotesk",var(--sans); font-size:19px; }
+.scores-card-heading h2 { font-family:"Clash Grotesk","Satoshi","Segoe UI",sans-serif; font-size:19px; }
 .scores-card-heading p { font-size:11px; }
 .status-tabs { min-height:60px; padding:9px 14px; gap:5px; }
 .status-tab { min-height:36px; padding-inline:12px; border-radius:9px; font-size:11px; }
@@ -1563,12 +1563,12 @@ h1 span { color:#8a9b97; }
 .team-name { color:#e8f0ed; font-size:13px; }
 .team-badge { width:32px; height:32px; flex-basis:32px; }
 .team-badge img { width:22px; height:22px; }
-.score { font-family:"Space Grotesk",var(--sans); font-size:22px; }
+.score { font-family:"Clash Grotesk","Satoshi","Segoe UI",sans-serif; font-size:22px; }
 .match-clock { font-size:10px; }
 .favorite-button { width:32px; height:32px; }
 .match-panel { top:18px; min-height:430px; }
 .detail-empty { min-height:428px; }
-.detail-empty strong { font-family:"Space Grotesk",var(--sans); font-size:17px; }
+.detail-empty strong { font-family:"Clash Grotesk","Satoshi","Segoe UI",sans-serif; font-size:17px; }
 .detail-header { min-height:72px; padding:17px 20px 13px; }
 .detail-scoreboard { min-height:178px; padding:20px 16px 18px; grid-template-columns:minmax(0,1fr) 96px minmax(0,1fr); }
 .detail-team-copy > strong { font-size:14px; }
