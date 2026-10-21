@@ -1950,10 +1950,20 @@ body.detail-open:not(.detail-modal-open) #match-panel {
 body.detail-open:not(.detail-modal-open) .detail-content { width: auto; max-width: none; padding: 0 12px 16px; }
 body.detail-open:not(.detail-modal-open) .detail-header { min-height: 52px; padding: 8px 2px; position: sticky; top: 0; }
 body.detail-open:not(.detail-modal-open) .detail-close { min-height: 40px; padding-inline: 9px; }
-body.detail-open:not(.detail-modal-open) .detail-scoreboard { min-height: 130px; padding: 16px 8px; grid-template-columns: minmax(0,1fr) 72px minmax(0,1fr); gap: 7px; }
+body.detail-open:not(.detail-modal-open) .detail-scoreboard {
+  min-height: 138px;
+  padding: 16px 12px;
+  grid-template-columns: minmax(0,1fr) 74px minmax(0,1fr);
+  gap: 10px;
+}
+body.detail-open:not(.detail-modal-open) .detail-team { min-width: 0; gap: 8px; }
+body.detail-open:not(.detail-modal-open) .detail-team.home { justify-content: flex-start; text-align: left; }
+body.detail-open:not(.detail-modal-open) .detail-team.away { justify-content: flex-end; text-align: right; }
+body.detail-open:not(.detail-modal-open) .detail-team-copy { min-width: 0; }
 body.detail-open:not(.detail-modal-open) .detail-team-copy > strong { font-size: 13px; }
-body.detail-open:not(.detail-modal-open) .detail-team-badge { width: 50px; height: 50px; }
-body.detail-open:not(.detail-modal-open) .detail-team-badge img { width: 44px; height: 44px; }
+body.detail-open:not(.detail-modal-open) .detail-team-badge { width: 46px; height: 46px; }
+body.detail-open:not(.detail-modal-open) .detail-team-badge img { width: 40px; height: 40px; }
+body.detail-open:not(.detail-modal-open) .detail-score { gap: 8px; }
 body.detail-open:not(.detail-modal-open) .detail-score .score { font-size: 26px; }
 body.detail-open:not(.detail-modal-open) .detail-meta { padding-inline: 2px; }
 body.detail-open:not(.detail-modal-open) .detail-meta-item { font-size: 11px; }
@@ -2115,6 +2125,28 @@ body.light-theme .header-status-nav .status-tab.active { background: transparent
 .match-row .team-badge img {
   width: 40px;
   height: 40px;
+}
+.team-badge .flag-fabric,
+.detail-team-badge .flag-fabric {
+  display: none;
+}
+body:not(.light-theme):not(.neon-theme) .match-row .team-badge:has(img),
+body:not(.light-theme):not(.neon-theme) .live-card .team-badge:has(img),
+body:not(.light-theme):not(.neon-theme) .detail-scoreboard .detail-team-badge:has(img),
+body.light-theme .match-row .team-badge:has(img),
+body.light-theme .live-card .team-badge:has(img),
+body.light-theme .detail-scoreboard .detail-team-badge:has(img),
+body.neon-theme .match-row .team-badge:has(img),
+body.neon-theme .live-card .team-badge:has(img),
+body.neon-theme .detail-scoreboard .detail-team-badge:has(img) {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.team-badge img,
+.detail-team-badge img {
+  filter: none;
 }
 @media (max-width: 720px) {
   .match-row .team-badge {
