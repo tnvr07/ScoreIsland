@@ -1969,14 +1969,22 @@ body.detail-open:not(.detail-modal-open) .detail-meta { padding-inline: 2px; }
 body.detail-open:not(.detail-modal-open) .detail-meta-item { font-size: 11px; }
 body.detail-open:not(.detail-modal-open) .detail-tabs { gap: 0; }
 body.detail-open:not(.detail-modal-open) .detail-tab { padding-inline: 7px; font-size: 11px; }
-body.detail-open:not(.detail-modal-open) .detail-tab-content { max-height: min(380px,42vh); }
-body.detail-open:not(.detail-modal-open) .detail-section { padding-inline: 8px; }
+body.detail-open:not(.detail-modal-open) .detail-tab-content { max-height: none; overflow: visible; }
+body.detail-open:not(.detail-modal-open) .detail-overview-grid {
+  grid-template-columns: minmax(0,1fr);
+  gap: 0;
+  margin-top: 8px;
+}
+body.detail-open:not(.detail-modal-open) .detail-section { padding: 14px 12px 8px; }
 body.detail-open:not(.detail-modal-open) .detail-section h3 { font-size: 13px; }
 body.detail-open:not(.detail-modal-open) .timeline-text,
 body.detail-open:not(.detail-modal-open) .info-row,
 body.detail-open:not(.detail-modal-open) .detail-placeholder { font-size: 12px; }
 body.detail-open:not(.detail-modal-open) .momentum-card,
-body.detail-open:not(.detail-modal-open) .shot-map-card { padding: 13px 10px; }
+body.detail-open:not(.detail-modal-open) .shot-map-card {
+  padding: 16px 14px;
+  margin: 14px 0 0;
+}
 body.detail-open:not(.detail-modal-open) .momentum-heading h3,
 body.detail-open:not(.detail-modal-open) .shot-map-heading h3 { font-size: 15px; }
 
@@ -2115,6 +2123,20 @@ body.light-theme .header-status-nav .status-tab.active { background: transparent
 }
 @media (prefers-reduced-motion: reduce) {
   .has-live-scores .live-score-strip-indicator span { animation: none; }
+}
+
+html,
+body,
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .match-row .team-badge {
